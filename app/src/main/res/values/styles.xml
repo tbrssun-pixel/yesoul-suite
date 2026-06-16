@@ -1,7 +1,9 @@
 <resources>
-    <style name="Theme.YesoulTracker" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">#F7F8F6</item>
-        <item name="android:statusBarColor">#F7F8F6</item>
+    <style name="Theme.OwlBikeTracker" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/app_background</item>
+        <item name="android:statusBarColor">@color/app_background</item>
     </style>
 </resources>

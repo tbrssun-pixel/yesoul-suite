@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Extractive RAG</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 0; color: #1f2933; background: #f6f7f9; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 28px; margin: 0 0 8px; }
+    .meta { color: #5b6472; margin-bottom: 20px; }
+    input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #c9d1dc; border-radius: 6px; font-size: 16px; }
+    .result { background: white; border: 1px solid #dbe1e8; border-radius: 6px; padding: 14px 16px; margin-top: 12px; }
+    .path { color: #697386; font-size: 13px; margin-bottom: 8px; }
+    mark { background: #fff2a8; padding: 0 2px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Project Extractive RAG</h1>
+    <div class="meta">Local static search over generated project context. No network or API key required.</div>
+    <input id="q" placeholder="Search modules, docs, deploy, terminology..." autofocus>
+    <div id="results"></div>
+  </main>
+  <script src="./assets/wiki-data.js"></script>
+  <script>
+    const data = window.START_NEW_PROJECT_RAG || { chunks: [] };
+    const input = document.getElementById("q");
+    const results = document.getElementById("results");
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+    function search(query) {
+      const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+      if (!terms.length) return [];
+      return data.chunks.map((chunk) => {
+        const haystack = [chunk.title, chunk.heading, chunk.text, chunk.path].join(" ").toLowerCase();
+        const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
+        return { chunk, score };
+      }).filter((row) => row.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+    }
+    function render() {
+      const rows = search(input.value);
+      results.innerHTML = rows.map(({ chunk, score }) => {
+        return "<div class='result'><div class='path'>" + escapeHtml(chunk.path) + " | " + escapeHtml(chunk.heading) + " | score " + score + "</div><div>" + escapeHtml(chunk.text).slice(0, 900) + "</div></div>";
+      }).join("") || "<div class='meta'>No results.</div>";
+    }
+    input.addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>

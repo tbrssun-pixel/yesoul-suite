@@ -11,6 +11,8 @@ keystore.properties
 *.p12
 *.apk
 *.aab
+output/playwright/
+.screen_shots/
 *.iml
 .idea/
 .DS_Store

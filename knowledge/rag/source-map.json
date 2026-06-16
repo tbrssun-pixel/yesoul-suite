@@ -1,0 +1,473 @@
+{
+  "generated_by": "start-new-project",
+  "refined_by": "codex",
+  "generated_at": "2026-06-12T19:42:05.398Z",
+  "project": "yesoul-suite",
+  "root": "E:\\projects\\yesoul-suite",
+  "records": [
+    {
+      "source_path": ".gitattributes",
+      "artifact_path": "knowledge/modules/root.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "302266a0b9a482b15b10e052bdde95531ddd827a64b2b674243cebdc91299720",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": ".gitignore",
+      "artifact_path": "knowledge/modules/root.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "9bac4bc4a21f0ff2fd70d1c0d91a500be8bd4b4732c5c0d2b0dc62ff5978f06e",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "build.gradle.kts",
+      "artifact_path": "knowledge/modules/root.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "247c8bffc246de155a362b898ab8f3612796644797ead5422dce5a3a41620150",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "settings.gradle.kts",
+      "artifact_path": "knowledge/modules/root.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "d22f2864115e3ac019a187910f8f6c386071b71cfe3b745794dab3c42fa5a7b0",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "gradle.properties",
+      "artifact_path": "knowledge/modules/root.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "6afb5df56538a39c1d7e00c7677597ecf85fbc74ada55aedc7b831ad74424e29",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "LICENSE",
+      "artifact_path": "knowledge/docs/documentation-index.md",
+      "sensitivity": "public-safe",
+      "kind": "source-doc",
+      "checksum_sha256": "e29e4c2ea6e507d3cc96e7ae09f237c4c7e70a1c3013c5bda12af50b5fb6aa9f",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "README.md",
+      "artifact_path": "knowledge/docs/documentation-index.md",
+      "sensitivity": "public-safe",
+      "kind": "source-doc",
+      "checksum_sha256": "9f9114618b435722d5ba9978a06b1157ff1841455bac96216b94bd389cc3e519",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "AGENTS.md",
+      "artifact_path": "AGENTS.md",
+      "sensitivity": "repo-private",
+      "kind": "project-instructions",
+      "checksum_sha256": "ba5ae4399191d13f3311592828a596097488fe81e11d90492f825de6ebdff940",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/build.gradle.kts",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "1be63876dff18460903e1b0dcce9c3c3c7d9d26c10a8c90a363840a38a796c8d",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/proguard-rules.pro",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/AndroidManifest.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "70944500a620eff2bc6f57d0ba15b8605e576fb260e18d54025f3a13e005ebc6",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/xml/backup_rules.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "1a9c09e7a9e3345b2d41993f5b932a846bf7fa11d23aff19df73111ba73cf8e6",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "9883136d451816bdfd34f88c80ee2a5d77f86aeba7dba850c9032ece30e1c43e",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/xml/export_file_paths.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "55d7c7f587a0bbb1bf8efbd5af261756f39a9a3c45450069442dada0bd09b702",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/values/strings.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "b8cd0abed2eed33aea92e6894c99a3054160ea40cc7de58d4a9e070025909f61",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/values-en/strings.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "739cd3601b15ecebdac1c8dbfb9a2655095a929510e52d0c681f4a363e14259a",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/values/colors.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "f0584064a31432ef5cb13f49186466d46b7792f83ed99e863ff94dba22ee6f04",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/res/values/styles.xml",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "10bdf1e8e4ba29e73762c147d763be456f5c76f46369b7df548327160a0e1a40",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/MainActivity.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "05f2286eeee24b5847d4d61888cd6952bd3974ccf5c4f4820ee1d4ccf8010480",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/TrackerViewModel.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "104501d6c96957b6941a11c4a33b3fe1e0e4e4c83b7b89124ff4c741db1d43ca",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/BleConnectionService.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "ec8187a175ee866ed8c4a41f70b79c65ac4b2405760c38ce7c975da26967f7cf",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/BleModels.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "ac8d6cfc54d4fe8ec837085efb8edcb2509339f81406ce7a2e657459fd19d43c",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/BleParsers.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "512d5407bfb73a1cce36677e11903ddaa07884c2daff0051f1a08f102dfc3afc",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/BleSessionManager.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "5add563fd4c9dce96bf82ad2300b501a837970c7bdddb42faaba20c3e9ac7c11",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/BleUuids.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "d09d1157f602399abeac6891d6407533a6aa4ed1dd3765709f6283d32c8f5930",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/ble/YesoulBleClient.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "5996f9a936c88152c7d09060c1f2efdba19f8668e3aca974c93be3ec18848426",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/data/WorkoutDao.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "f58508466c3ffc6e0ac80dfb9c37709c1e54c1d6d08c4e1f58703098c17f1f76",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/data/WorkoutDatabase.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "3a155dfae3df5c9a4046be9b9ad1e49c02e6ec0af3d30d093cdf752051594ee9",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/data/WorkoutEntities.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "a4c128d7ea7a29f7c5b73f8c66a1480785c5b1fb9db5c57306b09373f493dcf5",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/data/WorkoutExporters.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "2ce72c81688dada0ad628bf00da8b2f3d510638af35d72907266281d6f5fb09b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/data/WorkoutRepository.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "778174933cd0440224dbe42073ccfde69374d8c7bbb4b9c024aa50495d6c2a4b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/race/GoalInputParser.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "1330780d5bede44695535f57e13f21c0f6b829cc424caa3806708cad36cb88d8",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/main/java/com/owlbike/v1tracker/race/RaceModels.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "5445f84235792f925c974905377b7ac90d120c7b93044755d919ad58f360b975",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/test/java/com/owlbike/v1tracker/ble/BleParsersTest.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "f08a3ca92627f5eb5ebfb03db184c38a560aa93a7df44c012abd362f5c5cf807",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/test/java/com/owlbike/v1tracker/data/WorkoutExportersTest.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "04fec319c49f8c67e8dcf43bd2f2de814c75709df734435892d840ea68ba716b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/test/java/com/owlbike/v1tracker/race/GoalInputParserTest.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "89097f5fa4132ed201d8d93fe7833b50f57fab066bb81bc52c62ef8a7748c52b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "app/src/test/java/com/owlbike/v1tracker/race/RaceModelsTest.kt",
+      "artifact_path": "knowledge/modules/app.md",
+      "sensitivity": "repo-private",
+      "kind": "module-source",
+      "checksum_sha256": "99004e97313bfe646622c549432c9fba92ecacc57ca0de261cecbed38bce281b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "tools/build-debug-apk.ps1",
+      "artifact_path": "knowledge/modules/tools.md",
+      "sensitivity": "runtime/deploy",
+      "kind": "module-source",
+      "checksum_sha256": "1f3bea79877dd1fe4387233b2346ca3b6236d22132e322e761ebca2d3fafce5c",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "tools/build-release-aab.ps1",
+      "artifact_path": "knowledge/modules/tools.md",
+      "sensitivity": "runtime/deploy",
+      "kind": "module-source",
+      "checksum_sha256": "54a009ab5cdaf2d497ad8f759257baef2989229389f0abb2555ecfc90d6c8ee4",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/next-actions.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "d915a2db6387111237a20fb9956d1d230522601788fcd3d41dbd9ceb37c0f756",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/verification.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "a5417cb9a2d4e8130e66b794a125a8ae654145a4dfefcb26ec182f6eb8c94116",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/public-context.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "public-safe",
+      "kind": "source-doc",
+      "checksum_sha256": "8fa6ac300ae896f63d055cc5669bfa3c8814b52ed5d72488499915b30f1aa36d",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/private-context.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "b2cf9cd785faea1d281c9b01517f1d0a4251c4f0e11843df696f876ab501fcb6",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/deploy.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "runtime/deploy",
+      "kind": "source-doc",
+      "checksum_sha256": "3dbc039a8bd29bf288be9ecd9af39f107ef350ecb79683cd1be937a9cdecdb09",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/play-compliance.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "eda684ae3dd3a3023f61ac7480b4f26e0f8527e7aed8af60a5f2ae1555aed020",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/privacy-policy.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "public-safe-draft",
+      "kind": "source-doc",
+      "checksum_sha256": "751d17538b53ce66d53c15c318f999c26bb7a0bde3a0ade0053f24e54761280f",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/store-listing.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "public-safe-draft",
+      "kind": "source-doc",
+      "checksum_sha256": "3353ff8a54e075c653ea57b7681ff9326d5caa31d8056343f357c2e7c84be593",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/decisions/0001-project-context-bootstrap.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "dcbc2689a83e7069c184263adab3878e34acff853a2545a590806621c3b2d183",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/design/owl-v1-dark-dashboard-handoff.md",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "cf6e2097c43fca5481d1a4433079af6d5cdbdabcd12aac94fdc5f208410a45ea",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "docs/design/owl-v1-dark-dashboard-prototype.html",
+      "artifact_path": "knowledge/modules/docs.md",
+      "sensitivity": "repo-private",
+      "kind": "source-doc",
+      "checksum_sha256": "5d80428666c80efee5002c26a13eedc0b969c1616491ad3e9e59eda9e03b914a",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/project.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "d51bbd4f6161db95390bf0a1b21a9a84e5f3d3e81ae1df9119124b7990899bd4",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/AGENTS.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "d5e3895946ec8fa14f3b8891e7852d95786360f5459973b7af6097f801cc40ad",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/ble-connection-diagnostics/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "107dec9a0ca7a4fb4c4798031e7b2c93387500fb6ffe0eeb4534672d2f5c8a25",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/workout-recording-history/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "dff9a085d71998a98b4ab3acfde35094fe3c9a0d12599176dbcdb1ed8a360be2",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/workout-export/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "be210a32668bd26900a131767968e1116bff89ae0636721153abb025227f72c3",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/local-privacy/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "4ef0c6f20208d796ee60584a666437c61d07d0fc3b39cfe352603afa35361a8b",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/release-controlled-beta/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "81d97d4a195ffd25fcb4564cf546644e45b4c7d6745319fea6375016f09243f1",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    },
+    {
+      "source_path": "openspec/specs/race-goal-baseline/spec.md",
+      "artifact_path": "knowledge/modules/openspec.md",
+      "sensitivity": "repo-private",
+      "kind": "behavior-spec",
+      "checksum_sha256": "a4346fce07aa3ae5121db239483d60d2b68dca4ee6a842a138e715fabb7c76c6",
+      "imported_at": "2026-06-12T19:42:05.398Z"
+    }
+  ]
+}
