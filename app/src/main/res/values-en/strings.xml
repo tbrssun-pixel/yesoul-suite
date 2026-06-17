@@ -29,8 +29,8 @@
     <string name="connect_subtitle_disconnected">Use a previously connected bike or scan nearby devices.</string>
     <string name="connect_subtitle_scanning">Keep the bike powered on. Found devices will appear below.</string>
     <string name="connect_subtitle_connecting">Waiting for the Bluetooth connection to finish.</string>
-    <string name="connect_subtitle_connected">Open Ride to start recording or disconnect the bike.</string>
-    <string name="open_ride">Open ride</string>
+    <string name="connect_subtitle_connected">Go to Ride to start recording or disconnect the bike.</string>
+    <string name="open_ride">Go to ride</string>
     <string name="continue_ride">Continue ride</string>
     <string name="connect_trainer">Connect trainer</string>
     <string name="connect_other_trainer">Connect another</string>
@@ -42,7 +42,7 @@
     <string name="median_distance">Median distance</string>
     <string name="median_calories">Median calories</string>
     <string name="median_duration">Median time</string>
-    <string name="home_history_total">History: %1$d rides total</string>
+    <string name="home_history_total">Saved: %1$d rides</string>
     <string name="home_history_hint">Open workouts, details, and export</string>
     <string name="view_history">History</string>
     <string name="previously_connected">Previously connected</string>
@@ -58,7 +58,7 @@
     <string name="unpair_confirm_body">Remove %1$s from My equipment? You can add it again after a successful connection.</string>
     <string name="unpair_confirm_action">Unpair</string>
     <string name="last_connected_value">Last connected: %1$s</string>
-    <string name="nearby_now">Nearby now</string>
+    <string name="nearby_now">Nearby</string>
     <string name="rssi_value">RSSI %1$d</string>
     <string name="only_trainers">Only trainers</string>
     <string name="device_type_trainer">Trainer</string>
@@ -95,10 +95,11 @@
     <string name="baseline_medians">Previous ride medians</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
-    <string name="finish">Finish</string>
+    <string name="finish">Finish ride</string>
     <string name="manual_resistance">Manual resistance</string>
     <string name="manual_resistance_note">YS-003 reports the current load to the app, but physical resistance is adjusted with the frame knob.</string>
-    <string name="race_with_shadow">Race with shadow</string>
+    <string name="race_with_shadow">Shadow race</string>
+    <string name="race_shadow_explainer">Compare today with your usual pace.</string>
     <string name="goal">Goal</string>
     <string name="edit_goal">Edit goal</string>
     <string name="you_today">You today</string>
@@ -116,10 +117,10 @@
     <string name="race_on_pace">Ahead</string>
     <string name="race_behind">Behind</string>
     <string name="race_steady">Steady</string>
-    <string name="race_need_more_rides">No baseline</string>
-    <string name="race_need_more_rides_long">Complete more rides with this metric to enable the moving shadow.</string>
-    <string name="race_to_goal_without_shadow">%1$s to goal. Complete more rides to unlock your median shadow.</string>
-    <string name="race_goal_without_shadow">Goal %1$s is complete. Complete more rides to unlock your median shadow.</string>
+    <string name="race_need_more_rides">Building median</string>
+    <string name="race_need_more_rides_long">Finish more rides to build your median Shadow.</string>
+    <string name="race_to_goal_without_shadow">%1$s to goal. Finish more rides to build your median Shadow.</string>
+    <string name="race_goal_without_shadow">Goal %1$s is complete. Finish more rides to build your median Shadow.</string>
     <string name="race_goal_completed">Goal %1$s is complete. Everything after this is bonus distance.</string>
     <string name="race_ahead_by">You are ahead of your median by %1$s.</string>
     <string name="race_behind_by">You are %1$s behind your median pace.</string>
@@ -134,15 +135,15 @@
     <string name="pace_above_typical">Above typical</string>
     <string name="pace_below_typical">Below typical</string>
     <string name="pace_steady">Steady pace</string>
-    <string name="remote_load_control">Remote load control</string>
+    <string name="remote_load_control">Load readout</string>
     <string name="current_load_value">Current load %1$s</string>
-    <string name="remote_ready">Remote ready</string>
-    <string name="disabled">Disabled</string>
-    <string name="remote_control_pending">This trainer appears compatible, but remote load commands are not enabled in this build.</string>
-    <string name="remote_control_unavailable">This bike reports load but does not accept remote changes.</string>
-    <string name="finish_confirmation">Finishing will save this workout. Confirm the action so a shaky tap does not end recording accidentally.</string>
+    <string name="remote_ready">Read-only</string>
+    <string name="disabled">Manual only</string>
+    <string name="remote_control_pending">Remote load is read-only in this build. Adjust resistance on the bike.</string>
+    <string name="remote_control_unavailable">Manual only. This bike reports load but does not accept remote changes.</string>
+    <string name="finish_confirmation">Save this workout and finish the ride? Confirm so an accidental tap does not stop recording.</string>
     <string name="cancel">Cancel</string>
-    <string name="confirm_finish">Finish</string>
+    <string name="confirm_finish">Save &amp; finish</string>
     <string name="use_median_goal">Use median goal</string>
     <string name="add_distance_unit">+%1$s %2$s</string>
     <string name="add_one_km">+1 km</string>
@@ -254,5 +255,13 @@
     <plurals name="hidden_ble_devices">
         <item quantity="one">%1$d other BLE device hidden.</item>
         <item quantity="other">%1$d other BLE devices hidden.</item>
+    </plurals>
+    <plurals name="saved_equipment_count">
+        <item quantity="one">%1$d saved</item>
+        <item quantity="other">%1$d saved</item>
+    </plurals>
+    <plurals name="nearby_devices_count">
+        <item quantity="one">%1$d nearby</item>
+        <item quantity="other">%1$d nearby</item>
     </plurals>
 </resources>

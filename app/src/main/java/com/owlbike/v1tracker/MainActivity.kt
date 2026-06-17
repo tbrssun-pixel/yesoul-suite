@@ -68,7 +68,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -104,6 +103,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
@@ -408,7 +408,6 @@ private fun OwlBikeApp(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                Header(state)
                 if (state.connectEntry != null) {
                     ConnectFlowHeader(
                         entry = state.connectEntry,
@@ -426,6 +425,7 @@ private fun OwlBikeApp(
                         onOpenRide = viewModel::openRidePlanning,
                     )
                 } else {
+                    PageTitleBar(stringResource(pageTitleRes(state)))
                     when (state.screen) {
                         AppScreen.Home -> HomeScreen(
                             state = state,
@@ -539,45 +539,32 @@ private fun SplashScreen(versionName: String, onContinue: () -> Unit) {
 }
 
 @Composable
-private fun Header(state: TrackerUiState) {
-    Column(
-        Modifier
+private fun PageTitleBar(title: String) {
+    Text(
+        text = title,
+        modifier = Modifier
             .fillMaxWidth()
             .background(AppBackground)
-            .padding(16.dp, 16.dp, 16.dp, 10.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AppInk,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = state.connection.deviceName ?: "Bike V1 / YS-003",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            StatusPill(state)
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 6.dp)
+            .semantics { heading() },
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = AppInk,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun pageTitleRes(state: TrackerUiState): Int {
+    return when (state.screen) {
+        AppScreen.Home -> R.string.tab_home
+        AppScreen.Ride -> when {
+            state.rideStage == RideStage.Results && state.lastFinishedSession != null && !state.isWorkoutRunning -> R.string.ride_saved_title
+            state.isWorkoutRunning -> R.string.live_ride
+            else -> R.string.ride_plan_title
         }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = "${stringResource(R.string.status)}: ${state.connection.status}",
-            style = MaterialTheme.typography.bodySmall,
-            color = AppMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        AppScreen.History -> R.string.tab_history
+        AppScreen.Profile -> R.string.profile_settings
     }
 }
 
@@ -634,7 +621,7 @@ private fun HomeScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -667,9 +654,8 @@ private fun HomeEquipmentPanel(
     )
     val displayName = when {
         state.connection.isConnected -> state.connection.deviceName
-            ?: state.connection.deviceAddress
             ?: EQUIPMENT_MODEL_NAME
-        lastDevice != null -> lastDevice.name ?: lastDevice.address
+        lastDevice != null -> lastDevice.name ?: EQUIPMENT_MODEL_NAME
         else -> stringResource(R.string.home_no_trainer)
     }
     val statusText = when {
@@ -839,12 +825,13 @@ private fun ConnectFlowHeader(entry: ConnectEntry, onClose: () -> Unit) {
         ConnectEntry.FirstSetup -> stringResource(R.string.connect_trainer)
     }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             title,
+            modifier = Modifier.weight(1f).semantics { heading() },
             style = MaterialTheme.typography.titleSmall,
             color = AppInk,
             fontWeight = FontWeight.SemiBold,
@@ -911,7 +898,7 @@ private fun ConnectScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
         ) {
             item { ConnectHero(state) }
             item {
@@ -927,7 +914,11 @@ private fun ConnectScreen(
                 item {
                     SectionTitle(
                         title = stringResource(R.string.my_equipment),
-                        meta = state.rememberedDevices.size.toString(),
+                        meta = pluralStringResource(
+                            R.plurals.saved_equipment_count,
+                            state.rememberedDevices.size,
+                            state.rememberedDevices.size,
+                        ),
                     )
                 }
                 items(state.rememberedDevices, key = { it.address }) { device ->
@@ -1047,6 +1038,8 @@ private fun NearbyDevicesHeader(
     showOnlyTrainerDevices: Boolean,
     onShowOnlyTrainerDevicesChange: (Boolean) -> Unit,
 ) {
+    val onlyTrainersLabel = stringResource(R.string.only_trainers)
+
     Row(
         Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1066,19 +1059,12 @@ private fun NearbyDevicesHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             if (visibleCount > 0) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = AppSurfaceMuted,
-                    border = BorderStroke(1.dp, AppBorder),
-                ) {
-                    Text(
-                        visibleCount.toString(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppMuted,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
+                Text(
+                    pluralStringResource(R.plurals.nearby_devices_count, visibleCount, visibleCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppMuted,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
         Row(
@@ -1086,13 +1072,16 @@ private fun NearbyDevicesHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                stringResource(R.string.only_trainers),
+                onlyTrainersLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = AppMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Switch(
+                modifier = Modifier.semantics {
+                    contentDescription = onlyTrainersLabel
+                },
                 checked = showOnlyTrainerDevices,
                 onCheckedChange = onShowOnlyTrainerDevicesChange,
             )
@@ -1120,8 +1109,7 @@ private fun HiddenDevicesHint(hiddenCount: Int) {
 @Composable
 private fun ConnectHero(state: TrackerUiState) {
     val deviceLabel = state.connection.deviceName
-        ?: state.connection.deviceAddress
-        ?: stringResource(R.string.unknown_device)
+        ?: EQUIPMENT_MODEL_NAME
     val title = when {
         !state.permissionsGranted -> stringResource(R.string.connect_title_permission)
         state.connection.isConnected -> stringResource(R.string.connect_title_connected, deviceLabel)
@@ -1302,15 +1290,6 @@ private fun EquipmentCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (displayName != device.address) {
-                    Text(
-                        device.address,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
                 Spacer(Modifier.height(6.dp))
                 Text(
                     statusLabel,
@@ -1429,6 +1408,13 @@ private fun EquipmentDetailSheet(
                     value = device.address,
                 )
                 HorizontalDivider(color = AppBorder)
+                if (nearbyDevice != null) {
+                    EquipmentDetailRow(
+                        label = stringResource(R.string.nearby_now),
+                        value = stringResource(R.string.rssi_value, nearbyDevice.rssi),
+                    )
+                    HorizontalDivider(color = AppBorder)
+                }
                 EquipmentDetailRow(
                     label = stringResource(R.string.last_connected),
                     value = formatDate(device.lastConnectedMillis),
@@ -1498,7 +1484,7 @@ private fun EquipmentThumbnail(modifier: Modifier = Modifier) {
 private fun equipmentDisplayName(
     device: RememberedDeviceEntity,
     nearbyDevice: BleDeviceItem?,
-): String = nearbyDevice?.name ?: device.name ?: device.address
+): String = nearbyDevice?.name ?: device.name ?: EQUIPMENT_MODEL_NAME
 
 @Composable
 private fun equipmentStatusText(address: String, connection: BleConnectionState): String {
@@ -1527,26 +1513,39 @@ private fun DeviceRow(
     onConnect: (BleDeviceItem) -> Unit,
     onDisconnect: () -> Unit,
 ) {
+    val statusLabel = equipmentStatusText(device.address, connection)
+    val statusColor = equipmentStatusColor(device.address, connection)
     Panel {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    device.name ?: device.address,
+                    device.name ?: stringResource(R.string.unknown_device),
                     fontWeight = FontWeight.SemiBold,
                     color = AppInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(device.address, style = MaterialTheme.typography.bodySmall, color = AppMuted)
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DeviceTypeChip(device.type)
-                    CompactChip(stringResource(R.string.rssi_value, device.rssi), AppMuted, AppSurfaceMuted)
-                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    statusLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = statusColor,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    deviceTypeLabel(device.type),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             DeviceActionButton(
                 address = device.address,
@@ -1637,43 +1636,10 @@ private fun DeviceActionButton(
 }
 
 @Composable
-private fun DeviceTypeChip(type: BleDeviceType) {
-    when (type) {
-        BleDeviceType.Trainer -> CompactChip(
-            stringResource(R.string.device_type_trainer),
-            AppAccent,
-            AppAccentSoft,
-        )
-        BleDeviceType.CyclingDevice -> CompactChip(
-            stringResource(R.string.device_type_cycling),
-            AppCyan,
-            AppSurfaceMuted,
-        )
-        BleDeviceType.Other -> CompactChip(
-            stringResource(R.string.device_type_other),
-            AppMuted,
-            AppSurfaceMuted,
-        )
-    }
-}
-
-@Composable
-private fun CompactChip(text: String, contentColor: Color, containerColor: Color) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = containerColor,
-        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.18f)),
-    ) {
-        Text(
-            text,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+private fun deviceTypeLabel(type: BleDeviceType): String = when (type) {
+    BleDeviceType.Trainer -> stringResource(R.string.device_type_trainer)
+    BleDeviceType.CyclingDevice -> stringResource(R.string.device_type_cycling)
+    BleDeviceType.Other -> stringResource(R.string.device_type_other)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1768,7 +1734,8 @@ private fun RidePlanningScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         RidePlanningHero(state, onStart)
@@ -1790,7 +1757,8 @@ private fun ActiveRideScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         WorkoutContextStrip(state)
@@ -1814,20 +1782,10 @@ private fun ActiveRideScreen(
 
 @Composable
 private fun RidePlanningHero(state: TrackerUiState, onStart: () -> Unit) {
-    Panel {
-        Text(
-            stringResource(R.string.ride_plan_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = AppInk,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            stringResource(R.string.ride_plan_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = AppMuted,
-        )
-        Spacer(Modifier.height(12.dp))
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Button(
             onClick = onStart,
             enabled = state.connection.isConnected,
@@ -1845,7 +1803,6 @@ private fun RidePlanningHero(state: TrackerUiState, onStart: () -> Unit) {
             )
         }
         if (!state.connection.isConnected) {
-            Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.ride_plan_connect_required),
                 style = MaterialTheme.typography.bodySmall,
@@ -1874,7 +1831,7 @@ private fun PlannedGoalPanel(state: TrackerUiState, onEditGoal: () -> Unit) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.planned_goal),
+                    stringResource(R.string.goal),
                     style = MaterialTheme.typography.titleSmall,
                     color = AppInk,
                     fontWeight = FontWeight.SemiBold,
@@ -2080,6 +2037,13 @@ private fun RaceTrackPanel(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
+                        stringResource(R.string.race_shadow_explainer),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
                         "${stringResource(R.string.goal)}: $targetText",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppMuted,
@@ -2198,11 +2162,13 @@ private fun PrimaryMetricCard(
         goal.source == GoalSource.Manual -> stringResource(R.string.goal_manual)
         else -> stringResource(R.string.goal_from_median)
     }
+    val accent = if (goal.isActive) AppAccent else AppCyan
 
     Card(
         modifier = Modifier.fillMaxWidth().heightIn(min = 132.dp),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = AppInk),
+        colors = CardDefaults.cardColors(containerColor = AppSurfaceMuted),
+        border = BorderStroke(1.dp, accent.copy(alpha = if (goal.isActive) 0.42f else 0.24f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -2215,18 +2181,18 @@ private fun PrimaryMetricCard(
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.labelMedium, color = AppLightCardMuted)
+                    Text(label, style = MaterialTheme.typography.labelMedium, color = AppMuted)
                     Surface(
                         modifier = Modifier.padding(top = 6.dp),
                         shape = RoundedCornerShape(50),
-                        color = AppLightCardText.copy(alpha = 0.07f),
-                        border = BorderStroke(1.dp, AppLightCardText.copy(alpha = 0.10f)),
+                        color = accent.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f)),
                     ) {
                         Text(
                             source,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = AppLightCardMuted,
+                            color = accent,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -2235,15 +2201,15 @@ private fun PrimaryMetricCard(
                 }
                 if (showEditGoal) {
                     TextButton(onClick = onEditGoal) {
-                        Text(stringResource(R.string.edit_goal), color = AppLightCardText)
+                        Text(stringResource(R.string.edit_goal), color = AppAccent)
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = AppLightCardText)
+                Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold, color = AppInk)
                 Spacer(Modifier.width(8.dp))
-                Text(unit, style = MaterialTheme.typography.titleMedium, color = AppLightCardMuted, modifier = Modifier.padding(bottom = 8.dp))
+                Text(unit, style = MaterialTheme.typography.titleMedium, color = accent, modifier = Modifier.padding(bottom = 8.dp))
             }
         }
     }
@@ -2348,35 +2314,45 @@ private fun ResistanceControlPanel(state: TrackerUiState) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.remote_load_control),
+                    stringResource(R.string.manual_resistance),
                     style = MaterialTheme.typography.titleSmall,
                     color = AppInk,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    stringResource(R.string.current_load_value, current?.format(1) ?: "-"),
+                    stringResource(R.string.telemetry_resistance),
                     style = MaterialTheme.typography.bodySmall,
                     color = AppMuted,
                 )
             }
-            MiniChip(
-                if (canSet) stringResource(R.string.remote_ready) else stringResource(R.string.disabled),
-                if (canSet) AppCyan else AppMuted,
-            )
+            MiniChip(stringResource(R.string.manual_only), AppCyan)
+        }
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            color = AppSurfaceMuted,
+        ) {
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.current_load_value, current?.format(1) ?: "-"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppInk,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    stringResource(R.string.manual_only),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppMuted,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
-        Slider(
-            value = (current ?: 1.0).toFloat().coerceIn(1f, 20f),
-            onValueChange = {},
-            enabled = false,
-            valueRange = 1f..20f,
-        )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("1", style = MaterialTheme.typography.labelSmall, color = AppMuted)
-            Text("10", style = MaterialTheme.typography.labelSmall, color = AppMuted)
-            Text("20", style = MaterialTheme.typography.labelSmall, color = AppMuted)
-        }
-        Spacer(Modifier.height(6.dp))
         Text(
             if (canSet) stringResource(R.string.remote_control_pending) else stringResource(R.string.remote_control_unavailable),
             style = MaterialTheme.typography.bodySmall,
@@ -2423,7 +2399,7 @@ private fun ActiveRideControls(
                     onClick = onRequestFinish,
                     enabled = state.isWorkoutRunning,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppDanger),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppAccent),
                 ) {
                     Text(stringResource(R.string.finish), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -2432,8 +2408,8 @@ private fun ActiveRideControls(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    color = AppDanger.copy(alpha = 0.10f),
-                    border = BorderStroke(1.dp, AppDanger.copy(alpha = 0.22f)),
+                    color = AppAccentSoft,
+                    border = BorderStroke(1.dp, AppAccent.copy(alpha = 0.22f)),
                 ) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -2452,7 +2428,7 @@ private fun ActiveRideControls(
                             Button(
                                 onClick = onConfirmFinish,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = AppDanger),
+                                colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
                             ) {
                                 Text(stringResource(R.string.confirm_finish))
                             }
@@ -2511,7 +2487,7 @@ private fun WorkoutControls(
                     onClick = onRequestFinish,
                     enabled = state.isWorkoutRunning,
                     modifier = Modifier.weight(1f).heightIn(min = 44.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppDanger),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppAccent),
                 ) {
                     Text(stringResource(R.string.finish), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -2520,8 +2496,8 @@ private fun WorkoutControls(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    color = AppDanger.copy(alpha = 0.10f),
-                    border = BorderStroke(1.dp, AppDanger.copy(alpha = 0.22f)),
+                    color = AppAccentSoft,
+                    border = BorderStroke(1.dp, AppAccent.copy(alpha = 0.22f)),
                 ) {
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -2540,7 +2516,7 @@ private fun WorkoutControls(
                             Button(
                                 onClick = onConfirmFinish,
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = AppDanger),
+                                colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
                             ) {
                                 Text(stringResource(R.string.confirm_finish))
                             }
@@ -3144,7 +3120,12 @@ private fun TriumphScreen(
                         .background(accent.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("O", color = accent, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Icon(
+                        painter = painterResource(R.drawable.ic_success_check),
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(32.dp),
+                    )
                 }
                 Text(title, style = MaterialTheme.typography.headlineSmall, color = AppInk, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -3304,14 +3285,13 @@ private fun HistoryScreen(
     }
     val groups = buildHistoryWeekGroups(state.sessions, state.expandedHistoryWeekStarts)
     LazyColumn(
-        Modifier.fillMaxSize().padding(16.dp),
+        Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
     ) {
         if (state.sessions.isNotEmpty()) {
             item { WeeklySummaryPanel(state.sessions, state.settings.unitSystem) }
         }
-        item { SectionTitle(stringResource(R.string.tab_history), state.sessions.size.takeIf { it > 0 }?.toString()) }
         if (state.sessions.isEmpty()) {
             item { EmptyStatePanel(stringResource(R.string.history_empty)) }
         }
@@ -3628,10 +3608,9 @@ private fun ProfileScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(bottom = 16.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { SectionTitle(stringResource(R.string.profile_settings)) }
         item {
             SettingsPanel(
                 settings = state.settings,
@@ -4183,19 +4162,12 @@ private fun SectionTitle(title: String, meta: String? = null) {
             color = AppInk,
         )
         if (meta != null) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = AppSurfaceMuted,
-                border = BorderStroke(1.dp, AppBorder),
-            ) {
-                Text(
-                    meta,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppMuted,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            Text(
+                meta,
+                style = MaterialTheme.typography.labelSmall,
+                color = AppMuted,
+                fontWeight = FontWeight.Medium,
+            )
         }
     }
 }
@@ -4230,7 +4202,6 @@ private fun SummaryStat(label: String, value: String, modifier: Modifier = Modif
         modifier = modifier.heightIn(min = 64.dp),
         shape = RoundedCornerShape(8.dp),
         color = AppSurfaceMuted,
-        border = BorderStroke(1.dp, AppBorder),
     ) {
         Column(Modifier.padding(10.dp)) {
             Text(

@@ -29,8 +29,8 @@
     <string name="connect_subtitle_disconnected">Используйте ранее подключённый велосипед или найдите устройство рядом.</string>
     <string name="connect_subtitle_scanning">Держите велосипед включённым. Найденные устройства появятся ниже.</string>
     <string name="connect_subtitle_connecting">Ожидаем завершения Bluetooth-подключения.</string>
-    <string name="connect_subtitle_connected">Откройте тренировку для записи поездки или отключите велосипед.</string>
-    <string name="open_ride">К тренировке</string>
+    <string name="connect_subtitle_connected">Перейдите к поездке, чтобы начать запись, или отключите велосипед.</string>
+    <string name="open_ride">К поездке</string>
     <string name="continue_ride">Продолжить поездку</string>
     <string name="connect_trainer">Подключить тренажёр</string>
     <string name="connect_other_trainer">Подключить другой</string>
@@ -42,7 +42,7 @@
     <string name="median_distance">Медиана дистанции</string>
     <string name="median_calories">Медиана калорий</string>
     <string name="median_duration">Медиана времени</string>
-    <string name="home_history_total">История: всего %1$d поездок</string>
+    <string name="home_history_total">Сохранено: %1$d поездок</string>
     <string name="home_history_hint">Открыть список тренировок и детали экспорта</string>
     <string name="view_history">История</string>
     <string name="previously_connected">Ранее подключённые</string>
@@ -58,7 +58,7 @@
     <string name="unpair_confirm_body">Удалить %1$s из «Моё оборудование»? Устройство можно добавить снова после успешного подключения.</string>
     <string name="unpair_confirm_action">Отвязать</string>
     <string name="last_connected_value">Последнее подключение: %1$s</string>
-    <string name="nearby_now">Рядом сейчас</string>
+    <string name="nearby_now">Рядом</string>
     <string name="rssi_value">RSSI %1$d</string>
     <string name="only_trainers">Только тренажёры</string>
     <string name="device_type_trainer">Тренажёр</string>
@@ -95,10 +95,11 @@
     <string name="baseline_medians">Медианы прошлых поездок</string>
     <string name="pause">Пауза</string>
     <string name="resume">Продолжить</string>
-    <string name="finish">Завершить</string>
+    <string name="finish">Завершить поездку</string>
     <string name="manual_resistance">Ручная нагрузка</string>
     <string name="manual_resistance_note">YS-003 передаёт текущую нагрузку в приложение, но физически регулируется ручкой на раме.</string>
     <string name="race_with_shadow">Гонка с тенью</string>
+    <string name="race_shadow_explainer">Сравните сегодняшнюю поездку со своим обычным темпом.</string>
     <string name="goal">Цель</string>
     <string name="edit_goal">Изменить цель</string>
     <string name="you_today">Вы сегодня</string>
@@ -116,10 +117,10 @@
     <string name="race_on_pace">Впереди</string>
     <string name="race_behind">Отставание</string>
     <string name="race_steady">Ровно</string>
-    <string name="race_need_more_rides">Нет baseline</string>
-    <string name="race_need_more_rides_long">Нужно больше завершённых тренировок с этой метрикой, чтобы включить призрака.</string>
-    <string name="race_to_goal_without_shadow">До цели осталось %1$s. Завершите больше тренировок, чтобы включить медианного призрака.</string>
-    <string name="race_goal_without_shadow">Цель %1$s выполнена. Завершите больше тренировок, чтобы включить медианного призрака.</string>
+    <string name="race_need_more_rides">Собираем медиану</string>
+    <string name="race_need_more_rides_long">Завершите больше поездок, чтобы построить медианную тень.</string>
+    <string name="race_to_goal_without_shadow">До цели осталось %1$s. Завершите больше поездок, чтобы построить медианную тень.</string>
+    <string name="race_goal_without_shadow">Цель %1$s выполнена. Завершите больше поездок, чтобы построить медианную тень.</string>
     <string name="race_goal_completed">Цель %1$s выполнена. Дальше идёт бонусная дистанция.</string>
     <string name="race_ahead_by">Вы впереди медианы на %1$s.</string>
     <string name="race_behind_by">До медианного темпа не хватает %1$s.</string>
@@ -134,15 +135,15 @@
     <string name="pace_above_typical">Выше обычного</string>
     <string name="pace_below_typical">Ниже обычного</string>
     <string name="pace_steady">Ровный темп</string>
-    <string name="remote_load_control">Удалённая нагрузка</string>
+    <string name="remote_load_control">Показ нагрузки</string>
     <string name="current_load_value">Текущая нагрузка %1$s</string>
-    <string name="remote_ready">Remote ready</string>
-    <string name="disabled">Disabled</string>
-    <string name="remote_control_pending">Тренажёр выглядит совместимым, но команда изменения нагрузки не включена в этой сборке.</string>
-    <string name="remote_control_unavailable">Этот велосипед передаёт нагрузку, но не принимает удалённое изменение нагрузки.</string>
-    <string name="finish_confirmation">Завершение сохранит тренировку. Подтвердите действие, чтобы не закончить запись случайно.</string>
+    <string name="remote_ready">Только просмотр</string>
+    <string name="disabled">Только вручную</string>
+    <string name="remote_control_pending">Удалённая нагрузка в этой сборке доступна только для просмотра. Регулируйте сопротивление на велосипеде.</string>
+    <string name="remote_control_unavailable">Только вручную. Велосипед передаёт нагрузку, но не принимает удалённые изменения.</string>
+    <string name="finish_confirmation">Сохранить эту тренировку и завершить поездку? Подтвердите, чтобы случайное касание не остановило запись.</string>
     <string name="cancel">Отмена</string>
-    <string name="confirm_finish">Завершить</string>
+    <string name="confirm_finish">Сохранить и завершить</string>
     <string name="use_median_goal">Использовать медиану</string>
     <string name="add_distance_unit">+%1$s %2$s</string>
     <string name="add_one_km">+1 км</string>
@@ -256,5 +257,17 @@
         <item quantity="few">Скрыто %1$d других BLE-устройства.</item>
         <item quantity="many">Скрыто %1$d других BLE-устройств.</item>
         <item quantity="other">Скрыто %1$d других BLE-устройств.</item>
+    </plurals>
+    <plurals name="saved_equipment_count">
+        <item quantity="one">%1$d сохранено</item>
+        <item quantity="few">%1$d сохранено</item>
+        <item quantity="many">%1$d сохранено</item>
+        <item quantity="other">%1$d сохранено</item>
+    </plurals>
+    <plurals name="nearby_devices_count">
+        <item quantity="one">%1$d рядом</item>
+        <item quantity="few">%1$d рядом</item>
+        <item quantity="many">%1$d рядом</item>
+        <item quantity="other">%1$d рядом</item>
     </plurals>
 </resources>
