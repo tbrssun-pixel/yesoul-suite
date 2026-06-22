@@ -70,6 +70,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -122,6 +123,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.owlbike.v1tracker.ble.BleDeviceItem
 import com.owlbike.v1tracker.ble.BleDeviceType
 import com.owlbike.v1tracker.ble.BleConnectionState
+import com.owlbike.v1tracker.ble.RememberedEquipmentClassifier
 import com.owlbike.v1tracker.history.buildHistoryWeekGroups
 import com.owlbike.v1tracker.data.RememberedDeviceEntity
 import com.owlbike.v1tracker.data.WorkoutExportFormat
@@ -410,7 +412,6 @@ private fun OwlBikeApp(
             ) {
                 if (state.connectEntry != null) {
                     ConnectFlowHeader(
-                        entry = state.connectEntry,
                         onClose = viewModel::closeConnect,
                     )
                     ConnectScreen(
@@ -570,14 +571,30 @@ private fun pageTitleRes(state: TrackerUiState): Int {
 
 @Composable
 private fun StatusPill(state: TrackerUiState) {
+    if (state.connection.isScanning) {
+        val scanLabel = stringResource(R.string.connect_title_scanning)
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .semantics { contentDescription = scanLabel },
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = AppWarning,
+            )
+        }
+        return
+    }
+
     val statusColor = when {
         state.connection.isConnected -> AppSuccess
-        state.connection.isConnecting || state.connection.isScanning -> AppWarning
+        state.connection.isConnecting -> AppWarning
         else -> AppMuted
     }
     val label = when {
         state.connection.isConnected -> stringResource(R.string.connected)
-        state.connection.isScanning -> stringResource(R.string.scan)
         state.connection.isConnecting -> state.connection.status
         else -> stringResource(R.string.not_connected)
     }
@@ -633,8 +650,8 @@ private fun HomeScreen(
                 onConnectOther = onConnectOther,
             )
         }
-        item { HomeAchievementsPanel(state) }
         item { HomeHistoryPanel(state, onOpenHistory) }
+        item { HomeAchievementsPanel(state) }
     }
 }
 
@@ -646,7 +663,10 @@ private fun HomeEquipmentPanel(
     onConnectFirst: () -> Unit,
     onConnectOther: () -> Unit,
 ) {
-    val lastDevice = state.rememberedDevices.firstOrNull()
+    val nearbyByAddress = state.devices.associateBy { it.address }
+    val lastDevice = state.rememberedDevices.firstOrNull { device ->
+        isLikelyTrainerEquipment(device, nearbyByAddress[device.address])
+    }
     val action = resolveHomePrimaryAction(
         isConnected = state.connection.isConnected,
         isConnecting = state.connection.isConnecting,
@@ -752,8 +772,6 @@ private fun HomeEquipmentPanel(
 @Composable
 private fun HomeAchievementsPanel(state: TrackerUiState) {
     val unitSystem = state.settings.unitSystem
-    val finishedSessions = state.sessions.filter { it.state == "finished" }
-    val totalDistance = finishedSessions.mapNotNull { it.totalDistanceMeters }.sum().takeIf { it > 0.0 }
     val baseline = state.personalBaseline
     val medianDuration = baseline.medianDistanceDurationSeconds ?: baseline.medianCaloriesDurationSeconds
     Panel {
@@ -765,32 +783,37 @@ private fun HomeAchievementsPanel(state: TrackerUiState) {
         )
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SummaryStat(stringResource(R.string.days_streak), baseline.currentStreakDays.toString(), Modifier.weight(1f))
-            SummaryStat(stringResource(R.string.total_distance), MeasurementFormatter.distance(totalDistance, unitSystem), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryStat(
+                stringResource(R.string.days_streak),
+                baseline.currentStreakDays.toString(),
+                Modifier.weight(1f),
+                prominentValue = true,
+            )
             SummaryStat(
                 stringResource(R.string.median_distance),
                 MeasurementFormatter.distance(baseline.medianDistanceMeters, unitSystem),
                 Modifier.weight(1f),
             )
-            SummaryStat(stringResource(R.string.median_calories), baseline.medianCalories?.toString() ?: "-", Modifier.weight(1f))
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryStat(stringResource(R.string.median_calories), baseline.medianCalories?.toString() ?: "-", Modifier.weight(1f))
             SummaryStat(
                 stringResource(R.string.median_duration),
                 medianDuration?.let(::formatDurationSeconds) ?: "-",
                 Modifier.weight(1f),
             )
-            SummaryStat(stringResource(R.string.sessions), finishedSessions.size.toString(), Modifier.weight(1f))
         }
     }
 }
 
 @Composable
 private fun HomeHistoryPanel(state: TrackerUiState, onOpenHistory: () -> Unit) {
+    val unitSystem = state.settings.unitSystem
+    val finishedSessions = state.sessions.filter { it.state == "finished" }
+    val savedRideCount = finishedSessions.size
+    val totalDistance = finishedSessions.mapNotNull { it.totalDistanceMeters }.sum().takeIf { it > 0.0 }
+
     Panel(
         modifier = Modifier.clickable(role = Role.Button, onClick = onOpenHistory),
     ) {
@@ -799,31 +822,41 @@ private fun HomeHistoryPanel(state: TrackerUiState, onOpenHistory: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.home_history_total, state.sessions.count { it.state == "finished" }),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = AppInk,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    stringResource(R.string.home_history_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppMuted,
-                )
-            }
-            Text(stringResource(R.string.view_history), color = AppAccent, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.view_history),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = AppInk,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(stringResource(R.string.open_history), color = AppAccent, fontWeight = FontWeight.SemiBold)
         }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryStat(
+                stringResource(R.string.saved_rides),
+                savedRideCount.toString(),
+                Modifier.weight(1f),
+                prominentValue = true,
+            )
+            SummaryStat(
+                stringResource(R.string.total_distance),
+                MeasurementFormatter.distance(totalDistance, unitSystem),
+                Modifier.weight(1f),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.home_history_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = AppMuted,
+        )
     }
 }
 
 @Composable
-private fun ConnectFlowHeader(entry: ConnectEntry, onClose: () -> Unit) {
-    val title = when (entry) {
-        ConnectEntry.ReconnectLast -> stringResource(R.string.reconnect_last_trainer)
-        ConnectEntry.ConnectOther -> stringResource(R.string.connect_other_trainer)
-        ConnectEntry.FirstSetup -> stringResource(R.string.connect_trainer)
-    }
+private fun ConnectFlowHeader(onClose: () -> Unit) {
+    val title = stringResource(R.string.connect_flow_title)
     Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -868,19 +901,15 @@ private fun ConnectScreen(
     val equipmentSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val unrememberedNearbyDevices = state.devices.filterNot { it.address in rememberedAddresses }
     val visibleNearbyDevices = if (showOnlyTrainerDevices) {
-        unrememberedNearbyDevices.filter { it.type != BleDeviceType.Other || it.address == activeDeviceAddress }
+        unrememberedNearbyDevices.filter { it.type == BleDeviceType.Trainer || it.address == activeDeviceAddress }
     } else {
         unrememberedNearbyDevices
     }
     val hiddenOtherDeviceCount = if (showOnlyTrainerDevices) {
-        unrememberedNearbyDevices.count { it.type == BleDeviceType.Other && it.address != activeDeviceAddress }
+        unrememberedNearbyDevices.count { it.type != BleDeviceType.Trainer && it.address != activeDeviceAddress }
     } else {
         0
     }
-    val showNearbySection = visibleNearbyDevices.isNotEmpty() ||
-        hiddenOtherDeviceCount > 0 ||
-        (state.connection.isScanning && unrememberedNearbyDevices.isEmpty())
-
     LaunchedEffect(selectedEquipmentAddress, selectedEquipment) {
         if (selectedEquipmentAddress != null && selectedEquipment == null) {
             selectedEquipmentAddress = null
@@ -900,15 +929,17 @@ private fun ConnectScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
         ) {
-            item { ConnectHero(state) }
-            item {
-                ConnectPrimaryActions(
-                    state = state,
-                    onGrantPermissions = onGrantPermissions,
-                    onScan = onScan,
-                    onStopScan = onStopScan,
-                    onOpenRide = onOpenRide,
-                )
+            if (!state.permissionsGranted) {
+                item { ConnectHero(state) }
+                item {
+                    ConnectPrimaryActions(
+                        state = state,
+                        onGrantPermissions = onGrantPermissions,
+                        onScan = onScan,
+                        onStopScan = onStopScan,
+                        onOpenRide = onOpenRide,
+                    )
+                }
             }
             if (state.permissionsGranted && state.rememberedDevices.isNotEmpty()) {
                 item {
@@ -930,10 +961,11 @@ private fun ConnectScreen(
                         onConnect = onConnect,
                         onConnectRemembered = onConnectRemembered,
                         onDisconnect = onDisconnect,
+                        onRequestUnpair = { unpairCandidateAddress = device.address },
                     )
                 }
             }
-            if (state.permissionsGranted && showNearbySection) {
+            if (state.permissionsGranted) {
                 item {
                     NearbyDevicesHeader(
                         visibleCount = visibleNearbyDevices.size,
@@ -941,16 +973,26 @@ private fun ConnectScreen(
                         onShowOnlyTrainerDevicesChange = { showOnlyTrainerDevices = it },
                     )
                 }
+                item { ConnectHero(state) }
+                item {
+                    ConnectPrimaryActions(
+                        state = state,
+                        onGrantPermissions = onGrantPermissions,
+                        onScan = onScan,
+                        onStopScan = onStopScan,
+                        onOpenRide = onOpenRide,
+                    )
+                }
                 if (hiddenOtherDeviceCount > 0) {
                     item { HiddenDevicesHint(hiddenOtherDeviceCount) }
                 }
-                if (visibleNearbyDevices.isEmpty()) {
+                if (visibleNearbyDevices.isEmpty() && !state.connection.isConnected && !state.connection.isConnecting) {
                     item {
                         EmptyStatePanel(
-                            if (showOnlyTrainerDevices && hiddenOtherDeviceCount > 0) {
-                                stringResource(R.string.nearby_trainers_empty)
-                            } else {
-                                stringResource(R.string.nearby_devices_hint)
+                            when {
+                                showOnlyTrainerDevices && hiddenOtherDeviceCount > 0 -> stringResource(R.string.nearby_trainers_empty)
+                                state.connection.isScanning -> stringResource(R.string.nearby_devices_hint)
+                                else -> stringResource(R.string.devices_empty)
                             },
                         )
                     }
@@ -1084,6 +1126,14 @@ private fun NearbyDevicesHeader(
                 },
                 checked = showOnlyTrainerDevices,
                 onCheckedChange = onShowOnlyTrainerDevicesChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AppBackground,
+                    checkedTrackColor = AppAccent,
+                    checkedBorderColor = AppAccent,
+                    uncheckedThumbColor = AppBackground,
+                    uncheckedTrackColor = AppSurfaceMuted,
+                    uncheckedBorderColor = AppBorder,
+                ),
             )
         }
     }
@@ -1249,10 +1299,20 @@ private fun EquipmentCard(
     onConnect: (BleDeviceItem) -> Unit,
     onConnectRemembered: (RememberedDeviceEntity) -> Unit,
     onDisconnect: () -> Unit,
+    onRequestUnpair: () -> Unit,
 ) {
-    val displayName = equipmentDisplayName(device, nearbyDevice)
+    val isTrainer = isLikelyTrainerEquipment(device, nearbyDevice)
+    val bluetoothName = equipmentDisplayName(device, nearbyDevice)
+    val title = if (isTrainer) EQUIPMENT_MODEL_NAME else bluetoothName
+    val subtitle = if (isTrainer) {
+        bluetoothName
+    } else {
+        stringResource(R.string.equipment_type_other_device)
+    }
     val statusLabel = equipmentStatusText(device.address, connection)
     val statusColor = equipmentStatusColor(device.address, connection)
+    val isActiveDevice = connection.deviceAddress == device.address
+    val showStatus = isActiveDevice && (connection.isConnected || connection.isConnecting)
     val connectEquipment = {
         if (nearbyDevice != null) {
             onConnect(nearbyDevice)
@@ -1272,10 +1332,10 @@ private fun EquipmentCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            EquipmentThumbnail(Modifier.size(82.dp))
+            EquipmentThumbnail(Modifier.size(64.dp), framed = false)
             Column(Modifier.weight(1f)) {
                 Text(
-                    EQUIPMENT_MODEL_NAME,
+                    title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = AppInk,
@@ -1284,32 +1344,168 @@ private fun EquipmentCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    displayName,
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = AppMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    statusLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = statusColor,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (showStatus) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        statusLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = statusColor,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            EquipmentPowerToggle(
+                address = device.address,
+                connection = connection,
+                isTrainer = isTrainer,
+                isAvailable = isTrainer || isActiveDevice,
+                onConnect = connectEquipment,
+                onDisconnect = onDisconnect,
+                onRequestUnpair = onRequestUnpair,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EquipmentPowerToggle(
+    address: String,
+    connection: BleConnectionState,
+    isTrainer: Boolean,
+    isAvailable: Boolean,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onRequestUnpair: () -> Unit,
+    modifier: Modifier = Modifier.width(76.dp).height(44.dp),
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val isActiveDevice = connection.deviceAddress == address
+    val isConnectingDevice = connection.isConnecting && isActiveDevice
+    val isConnectedDevice = connection.isConnected && isActiveDevice
+    val anotherDeviceActive = !isActiveDevice && (connection.isConnecting || connection.isConnected)
+    val label = stringResource(
+        if (isConnectedDevice) {
+            R.string.equipment_toggle_on
+        } else {
+            R.string.equipment_toggle_off
+        },
+    )
+    val canTurnOn = isTrainer && isAvailable && !isConnectedDevice && !isConnectingDevice && !anotherDeviceActive
+    val canTurnOff = isActiveDevice && (connection.isConnected || connection.isConnecting)
+    val backgroundColor = when {
+        isConnectedDevice -> AppAccentSoft
+        isTrainer -> AppSurfaceMuted
+        else -> AppSurfaceMuted.copy(alpha = 0.55f)
+    }
+    val borderColor = when {
+        isConnectedDevice -> AppAccent.copy(alpha = 0.58f)
+        isTrainer -> AppBorder
+        else -> AppBorder.copy(alpha = 0.60f)
+    }
+    val textColor = when {
+        isConnectedDevice -> AppAccent
+        isTrainer -> AppInk
+        else -> AppMuted.copy(alpha = 0.72f)
+    }
+    val currentOnColor = if (isConnectedDevice) AppAccent else AppInk
+    val currentOffColor = if (!isConnectedDevice && !isConnectingDevice) AppAccent else AppInk
+    val actionsLabel = stringResource(R.string.equipment_actions)
+
+    Box {
+        Surface(
+            modifier = modifier
+                .semantics {
+                    contentDescription = actionsLabel
+                    stateDescription = label
+                }
+                .clickable(
+                    role = Role.Button,
+                    onClick = { expanded = true },
+                ),
+            shape = RoundedCornerShape(50),
+            color = backgroundColor,
+            border = BorderStroke(1.dp, borderColor),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isConnectingDevice) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = AppMuted,
+                    )
+                } else {
+                    Text(
+                        label,
+                        color = textColor,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        DeviceActionButton(
-            address = device.address,
-            connection = connection,
-            onConnect = connectEquipment,
-            onDisconnect = onDisconnect,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            connectLabel = stringResource(R.string.connect_equipment),
-        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.equipment_menu_on),
+                        color = currentOnColor,
+                        fontWeight = if (isConnectedDevice) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                },
+                enabled = canTurnOn,
+                onClick = {
+                    expanded = false
+                    onConnect()
+                },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.equipment_menu_off),
+                        color = currentOffColor,
+                        fontWeight = if (!isConnectedDevice && !isConnectingDevice) {
+                            FontWeight.SemiBold
+                        } else {
+                            FontWeight.Normal
+                        },
+                    )
+                },
+                enabled = canTurnOff,
+                onClick = {
+                    expanded = false
+                    onDisconnect()
+                },
+            )
+            HorizontalDivider(color = AppBorder)
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.equipment_menu_delete),
+                        color = AppDanger,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onRequestUnpair()
+                },
+            )
+        }
     }
 }
 
@@ -1323,10 +1519,15 @@ private fun EquipmentDetailSheet(
     onDisconnect: () -> Unit,
     onRequestUnpair: () -> Unit,
 ) {
+    val isTrainer = isLikelyTrainerEquipment(device, nearbyDevice)
     val displayName = equipmentDisplayName(device, nearbyDevice)
     val bluetoothName = nearbyDevice?.name ?: device.name ?: stringResource(R.string.unknown_device)
+    val title = if (isTrainer) EQUIPMENT_MODEL_NAME else bluetoothName
+    val subtitle = if (isTrainer) displayName else stringResource(R.string.equipment_type_other_device)
+    val equipmentModel = if (isTrainer) EQUIPMENT_MODEL_NAME else stringResource(R.string.equipment_type_other_device)
     val statusLabel = equipmentStatusText(device.address, connection)
     val statusColor = equipmentStatusColor(device.address, connection)
+    val isActiveDevice = connection.deviceAddress == device.address
     val connectEquipment = {
         if (nearbyDevice != null) {
             onConnect(nearbyDevice)
@@ -1354,7 +1555,7 @@ private fun EquipmentDetailSheet(
         EquipmentThumbnail(Modifier.size(184.dp))
         Spacer(Modifier.height(16.dp))
         Text(
-            EQUIPMENT_MODEL_NAME,
+            title,
             style = MaterialTheme.typography.headlineSmall,
             color = AppInk,
             fontWeight = FontWeight.SemiBold,
@@ -1362,7 +1563,7 @@ private fun EquipmentDetailSheet(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            displayName,
+            subtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = AppMuted,
             textAlign = TextAlign.Center,
@@ -1377,15 +1578,17 @@ private fun EquipmentDetailSheet(
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(18.dp))
-        DeviceActionButton(
-            address = device.address,
-            connection = connection,
-            onConnect = connectEquipment,
-            onDisconnect = onDisconnect,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            connectLabel = stringResource(R.string.connect_equipment),
-        )
-        Spacer(Modifier.height(22.dp))
+        if (isTrainer || isActiveDevice) {
+            DeviceActionButton(
+                address = device.address,
+                connection = connection,
+                onConnect = connectEquipment,
+                onDisconnect = onDisconnect,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                connectLabel = stringResource(R.string.connect_equipment),
+            )
+            Spacer(Modifier.height(22.dp))
+        }
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
@@ -1400,7 +1603,7 @@ private fun EquipmentDetailSheet(
                 HorizontalDivider(color = AppBorder)
                 EquipmentDetailRow(
                     label = stringResource(R.string.equipment_model),
-                    value = EQUIPMENT_MODEL_NAME,
+                    value = equipmentModel,
                 )
                 HorizontalDivider(color = AppBorder)
                 EquipmentDetailRow(
@@ -1461,7 +1664,21 @@ private fun EquipmentDetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun EquipmentThumbnail(modifier: Modifier = Modifier) {
+private fun EquipmentThumbnail(modifier: Modifier = Modifier, framed: Boolean = true) {
+    if (!framed) {
+        Box(
+            modifier = modifier.padding(2.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        return
+    }
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -1485,6 +1702,17 @@ private fun equipmentDisplayName(
     device: RememberedDeviceEntity,
     nearbyDevice: BleDeviceItem?,
 ): String = nearbyDevice?.name ?: device.name ?: EQUIPMENT_MODEL_NAME
+
+private fun isLikelyTrainerEquipment(
+    device: RememberedDeviceEntity,
+    nearbyDevice: BleDeviceItem? = null,
+): Boolean {
+    return RememberedEquipmentClassifier.isLikelyTrainer(
+        name = device.name,
+        serviceUuidsText = device.serviceUuidsText,
+        nearbyDevice = nearbyDevice,
+    )
+}
 
 @Composable
 private fun equipmentStatusText(address: String, connection: BleConnectionState): String {
@@ -4197,9 +4425,14 @@ private fun NoticePanel(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SummaryStat(label: String, value: String, modifier: Modifier = Modifier) {
+private fun SummaryStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    prominentValue: Boolean = false,
+) {
     Surface(
-        modifier = modifier.heightIn(min = 64.dp),
+        modifier = modifier.heightIn(min = if (prominentValue) 76.dp else 64.dp),
         shape = RoundedCornerShape(8.dp),
         color = AppSurfaceMuted,
     ) {
@@ -4214,7 +4447,7 @@ private fun SummaryStat(label: String, value: String, modifier: Modifier = Modif
             Spacer(Modifier.height(4.dp))
             Text(
                 value,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (prominentValue) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleSmall,
                 color = AppInk,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,

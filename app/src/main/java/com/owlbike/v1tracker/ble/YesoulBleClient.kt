@@ -75,6 +75,7 @@ class YesoulBleClient(private val context: Context) {
                 _connection.value = _connection.value.copy(
                     isConnected = true,
                     isConnecting = false,
+                    servicesDiscovered = false,
                     status = "Connected; discovering services",
                 )
                 if (hasConnectPermission()) {
@@ -84,6 +85,7 @@ class YesoulBleClient(private val context: Context) {
                 _connection.value = _connection.value.copy(
                     isConnected = false,
                     isConnecting = false,
+                    servicesDiscovered = false,
                     status = "Disconnected: $status",
                     capabilities = BleCapabilities(),
                 )
@@ -96,7 +98,10 @@ class YesoulBleClient(private val context: Context) {
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                _connection.value = _connection.value.copy(status = "Service discovery failed: $status")
+                _connection.value = _connection.value.copy(
+                    servicesDiscovered = false,
+                    status = "Service discovery failed: $status",
+                )
                 return
             }
             val capabilities = inspectCapabilities(gatt)
@@ -104,6 +109,7 @@ class YesoulBleClient(private val context: Context) {
                 .getService(BleUuids.FITNESS_MACHINE_SERVICE)
                 ?.getCharacteristic(BleUuids.FITNESS_MACHINE_CONTROL_POINT)
             _connection.value = _connection.value.copy(
+                servicesDiscovered = true,
                 status = "Services discovered",
                 capabilities = capabilities,
             )

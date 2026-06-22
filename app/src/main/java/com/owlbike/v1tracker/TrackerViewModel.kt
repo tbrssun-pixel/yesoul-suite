@@ -7,6 +7,7 @@ import com.owlbike.v1tracker.ble.BikeMetrics
 import com.owlbike.v1tracker.ble.BleConnectionState
 import com.owlbike.v1tracker.ble.BleDeviceItem
 import com.owlbike.v1tracker.ble.BleSessionManager
+import com.owlbike.v1tracker.ble.RememberedEquipmentClassifier
 import com.owlbike.v1tracker.data.DiagnosticSnapshotEntity
 import com.owlbike.v1tracker.data.RememberedDeviceEntity
 import com.owlbike.v1tracker.data.WorkoutDatabase
@@ -164,7 +165,14 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun reconnectLastRememberedDevice() {
-        val device = _uiState.value.rememberedDevices.firstOrNull()
+        val state = _uiState.value
+        val device = state.rememberedDevices.firstOrNull { rememberedDevice ->
+            RememberedEquipmentClassifier.isLikelyTrainer(
+                name = rememberedDevice.name,
+                serviceUuidsText = rememberedDevice.serviceUuidsText,
+                nearbyDevice = state.devices.firstOrNull { it.address == rememberedDevice.address },
+            )
+        }
         if (device == null) {
             openConnect(ConnectEntry.FirstSetup)
             return
@@ -228,18 +236,35 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
 
     fun stopScan() = bleSession.stopScan()
 
-    fun connect(device: BleDeviceItem) = bleSession.connect(device)
+    fun connect(device: BleDeviceItem) {
+        if (!canStartConnection(device.address)) return
+        bleSession.connect(device)
+    }
 
     fun connectRememberedDevice(device: RememberedDeviceEntity) {
+        val state = _uiState.value
+        val nearbyDevice = state.devices.firstOrNull { it.address == device.address }
+        if (
+            !RememberedEquipmentClassifier.isLikelyTrainer(
+                name = device.name,
+                serviceUuidsText = device.serviceUuidsText,
+                nearbyDevice = nearbyDevice,
+            )
+        ) {
+            return
+        }
+        if (!canStartConnection(device.address)) return
         bleSession.connect(
             BleDeviceItem(
                 name = device.name,
                 address = device.address,
                 rssi = device.lastRssi ?: 0,
-                serviceUuids = device.serviceUuidsText
-                    ?.lines()
-                    ?.filter { it.isNotBlank() }
-                    .orEmpty(),
+                serviceUuids = RememberedEquipmentClassifier.parseServiceUuids(device.serviceUuidsText),
+                type = RememberedEquipmentClassifier.classify(
+                    name = device.name,
+                    serviceUuidsText = device.serviceUuidsText,
+                    nearbyDevice = nearbyDevice,
+                ),
                 lastSeenMillis = System.currentTimeMillis(),
             ),
         )
@@ -547,6 +572,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun rememberConnectedDevice(connection: BleConnectionState) {
+        if (!RememberedEquipmentClassifier.canRememberConnection(connection)) return
         val address = connection.deviceAddress?.takeIf { it.isNotBlank() } ?: return
         if (lastRememberedDeviceAddress == address) return
         lastRememberedDeviceAddress = address
@@ -567,6 +593,13 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                     ?: rememberedDevice?.serviceUuidsText,
             ),
         )
+    }
+
+    private fun canStartConnection(address: String): Boolean {
+        val connection = _uiState.value.connection
+        val anotherDeviceActive = connection.deviceAddress != address &&
+            (connection.isConnecting || connection.isConnected)
+        return !anotherDeviceActive
     }
 
     private fun startElapsedTicker() {

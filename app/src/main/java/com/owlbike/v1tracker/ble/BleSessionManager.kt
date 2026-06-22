@@ -50,6 +50,13 @@ object BleSessionManager {
     fun stopScan() = client.stopScan()
 
     fun connect(device: BleDeviceItem) {
+        val connection = client.connection.value
+        if (
+            connection.deviceAddress != device.address &&
+            (connection.isConnecting || connection.isConnected)
+        ) {
+            return
+        }
         manualDisconnect = false
         keepAliveActive = true
         lastDevice = device

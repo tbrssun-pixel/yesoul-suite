@@ -43,6 +43,39 @@ object BleDeviceClassifier {
     }
 }
 
+object RememberedEquipmentClassifier {
+    fun classify(
+        name: String?,
+        serviceUuidsText: String?,
+        nearbyDevice: BleDeviceItem? = null,
+    ): BleDeviceType {
+        if (nearbyDevice != null && nearbyDevice.type != BleDeviceType.Other) {
+            return nearbyDevice.type
+        }
+        return BleDeviceClassifier.classify(name, parseServiceUuids(serviceUuidsText))
+    }
+
+    fun isLikelyTrainer(
+        name: String?,
+        serviceUuidsText: String?,
+        nearbyDevice: BleDeviceItem? = null,
+    ): Boolean = classify(name, serviceUuidsText, nearbyDevice) == BleDeviceType.Trainer
+
+    fun canRememberConnection(connection: BleConnectionState): Boolean {
+        return connection.servicesDiscovered &&
+            connection.capabilities.hasIndoorBikeData &&
+            !connection.deviceAddress.isNullOrBlank()
+    }
+
+    fun parseServiceUuids(serviceUuidsText: String?): List<String> {
+        return serviceUuidsText
+            ?.lines()
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+    }
+}
+
 data class BleDeviceItem(
     val name: String?,
     val address: String,
@@ -65,6 +98,7 @@ data class BleConnectionState(
     val isScanning: Boolean = false,
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
+    val servicesDiscovered: Boolean = false,
     val deviceName: String? = null,
     val deviceAddress: String? = null,
     val status: String = "Idle",
