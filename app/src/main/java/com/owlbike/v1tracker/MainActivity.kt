@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -431,6 +432,8 @@ private fun OwlBikeApp(
                         AppScreen.Home -> HomeScreen(
                             state = state,
                             onOpenRide = viewModel::openRidePlanning,
+                            onSelectGoalType = viewModel::selectGoalType,
+                            onAdjustGoal = viewModel::adjustWorkoutGoal,
                             onReconnectLast = viewModel::reconnectLastRememberedDevice,
                             onConnectFirst = { viewModel.openConnect(ConnectEntry.FirstSetup) },
                             onConnectOther = { viewModel.openConnect(ConnectEntry.ConnectOther) },
@@ -631,6 +634,8 @@ private fun StatusPill(state: TrackerUiState) {
 private fun HomeScreen(
     state: TrackerUiState,
     onOpenRide: () -> Unit,
+    onSelectGoalType: (GoalType) -> Unit,
+    onAdjustGoal: (Int) -> Unit,
     onReconnectLast: () -> Unit,
     onConnectFirst: () -> Unit,
     onConnectOther: () -> Unit,
@@ -638,11 +643,12 @@ private fun HomeScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item { HomeAchievementBand(state, onOpenHistory) }
         item {
-            HomeEquipmentPanel(
+            HomeTrainerRow(
                 state = state,
                 onOpenRide = onOpenRide,
                 onReconnectLast = onReconnectLast,
@@ -650,13 +656,117 @@ private fun HomeScreen(
                 onConnectOther = onConnectOther,
             )
         }
-        item { HomeHistoryPanel(state, onOpenHistory) }
-        item { HomeAchievementsPanel(state) }
+        item {
+            HomeMedianDashboardRow(
+                state = state,
+                onSelectGoalType = onSelectGoalType,
+            )
+        }
+        item {
+            HomeNextWorkoutPlanner(
+                state = state,
+                onOpenRide = onOpenRide,
+                onAdjustGoal = onAdjustGoal,
+            )
+        }
     }
 }
 
 @Composable
-private fun HomeEquipmentPanel(
+private fun HomeAchievementBand(state: TrackerUiState, onOpenHistory: () -> Unit) {
+    val unitSystem = state.settings.unitSystem
+    val finishedSessions = state.sessions.filter { it.state == "finished" }
+    val totalDistanceMeters = finishedSessions.mapNotNull { it.totalDistanceMeters }.sum()
+    val totalDistanceText = MeasurementFormatter.distance(totalDistanceMeters, unitSystem)
+    val streakDays = state.personalBaseline.currentStreakDays
+    val description = stringResource(R.string.home_dashboard_achievement_description, streakDays, totalDistanceText)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button, onClick = onOpenHistory)
+            .semantics { contentDescription = description },
+        shape = RoundedCornerShape(8.dp),
+        color = AppSurface,
+        border = BorderStroke(1.dp, AppGold.copy(alpha = 0.38f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppGold.copy(alpha = 0.05f))
+                .padding(horizontal = 14.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DashboardAchievementMetric(
+                label = stringResource(R.string.days_streak_short),
+                value = streakDays.toString(),
+                accent = AppGold,
+                modifier = Modifier.weight(1f),
+                icon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_flame),
+                        contentDescription = null,
+                        tint = AppGold,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(58.dp)
+                    .background(AppBorder.copy(alpha = 0.74f)),
+            )
+            DashboardAchievementMetric(
+                label = stringResource(
+                    R.string.total_distance_short_unit,
+                    MeasurementFormatter.distanceUnit(unitSystem),
+                ),
+                value = totalDistanceText,
+                accent = AppAccent,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardAchievementMetric(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    icon: (@Composable () -> Unit)? = null,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineMedium,
+                color = AppInk,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (icon != null) {
+                Spacer(Modifier.width(6.dp))
+                icon()
+            }
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun HomeTrainerRow(
     state: TrackerUiState,
     onOpenRide: () -> Unit,
     onReconnectLast: () -> Unit,
@@ -704,17 +814,25 @@ private fun HomeEquipmentPanel(
         else -> ({})
     }
 
-    Panel {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = AppSurface,
+        border = BorderStroke(1.dp, AppBorder),
+    ) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            EquipmentThumbnail(Modifier.size(74.dp))
-            Column(Modifier.weight(1f)) {
+            EquipmentThumbnail(Modifier.size(48.dp), framed = false)
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
                 Text(
                     stringResource(R.string.home_last_trainer),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = AppMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -727,131 +845,414 @@ private fun HomeEquipmentPanel(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(6.dp))
                 MiniChip(statusText, statusColor)
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        Button(
-            onClick = primaryAction,
-            enabled = action != HomePrimaryAction.WaitForConnection || state.isWorkoutRunning,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppAccent,
-                disabledContainerColor = AppSurfaceMuted,
-                disabledContentColor = AppMuted,
-            ),
-        ) {
-            if (action == HomePrimaryAction.WaitForConnection && !state.isWorkoutRunning) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = AppMuted,
-                )
-                Spacer(Modifier.width(8.dp))
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Button(
+                    onClick = primaryAction,
+                    enabled = action != HomePrimaryAction.WaitForConnection || state.isWorkoutRunning,
+                    modifier = Modifier.widthIn(min = 112.dp, max = 154.dp).heightIn(min = 42.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppAccent,
+                        disabledContainerColor = AppSurfaceMuted,
+                        disabledContentColor = AppMuted,
+                    ),
+                ) {
+                    if (action == HomePrimaryAction.WaitForConnection && !state.isWorkoutRunning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = AppMuted,
+                        )
+                    } else {
+                        Text(
+                            primaryLabel,
+                            color = AppLightCardText,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onConnectOther,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.connect_other_trainer),
+                        color = AppAccent,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeMedianDashboardRow(
+    state: TrackerUiState,
+    onSelectGoalType: (GoalType) -> Unit,
+) {
+    val unitSystem = state.settings.unitSystem
+    val baseline = state.personalBaseline
+    val medianDuration = baseline.medianDistanceDurationSeconds ?: baseline.medianCaloriesDurationSeconds
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            stringResource(R.string.median_dashboard_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = AppInk,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 2.dp),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            DashboardMetric(
+                label = stringResource(R.string.median_distance_short),
+                value = baseline.medianDistanceMeters?.let { MeasurementFormatter.distance(it, unitSystem) } ?: "--",
+                accent = AppCyan,
+                selected = state.workoutGoal.type == GoalType.Distance,
+                enabled = baseline.hasDistanceBaseline,
+                onClick = { onSelectGoalType(GoalType.Distance) },
+                modifier = Modifier.weight(1f),
+            )
+            DashboardMetric(
+                label = stringResource(R.string.median_calories_short),
+                value = baseline.medianCalories?.toString() ?: "--",
+                accent = AppGold,
+                selected = state.workoutGoal.type == GoalType.Calories,
+                enabled = baseline.hasCaloriesBaseline,
+                onClick = { onSelectGoalType(GoalType.Calories) },
+                modifier = Modifier.weight(1f),
+            )
+            DashboardMetric(
+                label = stringResource(R.string.median_duration_short),
+                value = medianDuration?.let(::formatDurationSeconds) ?: "--",
+                accent = AppAccent,
+                selected = state.workoutGoal.type == GoalType.Duration,
+                enabled = medianDuration != null,
+                onClick = { onSelectGoalType(GoalType.Duration) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardMetric(
+    label: String,
+    value: String,
+    accent: Color,
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val selectedStateText = stringResource(
+        if (selected) R.string.goal_type_selected else R.string.goal_type_not_selected,
+    )
+    Surface(
+        modifier = modifier
+            .heightIn(min = 92.dp)
+            .alpha(if (enabled) 1f else 0.56f)
+            .semantics {
+                contentDescription = "$label: $value"
+                role = Role.Button
+                stateDescription = selectedStateText
+            }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) accent.copy(alpha = 0.10f) else AppSurfaceMuted,
+        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.72f else 0.18f)),
+    ) {
+        Column(
+            Modifier.padding(horizontal = 9.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
-                primaryLabel,
-                color = if (action == HomePrimaryAction.WaitForConnection && !state.isWorkoutRunning) AppMuted else AppLightCardText,
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                color = AppInk,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .width(24.dp)
+                    .height(2.dp)
+                    .background(accent.copy(alpha = 0.72f)),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = AppMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun goalTypeLabel(type: GoalType): String {
+    return when (type) {
+        GoalType.Distance -> stringResource(R.string.distance_goal)
+        GoalType.Calories -> stringResource(R.string.calories_goal)
+        GoalType.Duration -> stringResource(R.string.duration_goal)
+        GoalType.None -> stringResource(R.string.no_goal)
+    }
+}
+
+@Composable
+private fun goalTypeChipLabel(type: GoalType): String {
+    return when (type) {
+        GoalType.Distance -> stringResource(R.string.distance)
+        GoalType.Calories -> stringResource(R.string.calories)
+        GoalType.Duration -> stringResource(R.string.elapsed)
+        GoalType.None -> stringResource(R.string.no_goal)
+    }
+}
+
+@Composable
+private fun goalSourceLabel(goal: WorkoutGoal): String {
+    return when {
+        !goal.isActive -> stringResource(R.string.goal_not_set)
+        goal.source == GoalSource.Previous -> stringResource(R.string.goal_from_last_workout)
+        goal.source == GoalSource.Manual -> stringResource(R.string.goal_manual)
+        else -> stringResource(R.string.goal_from_median)
+    }
+}
+
+@Composable
+private fun HomeNextWorkoutPlanner(
+    state: TrackerUiState,
+    onOpenRide: () -> Unit,
+    onAdjustGoal: (Int) -> Unit,
+) {
+    val unitSystem = state.settings.unitSystem
+    val goal = state.workoutGoal
+    val target = goal.targetValue?.let { formatRaceMetric(goal.type, it, unitSystem) }
+        ?: stringResource(R.string.goal_free_ride)
+    val chipText = goalTypeChipLabel(goal.type)
+    val sourceText = if (goal.isActive) goalSourceLabel(goal) else stringResource(R.string.goal_free_ride)
+    val accent = when (goal.type) {
+        GoalType.Distance -> AppCyan
+        GoalType.Calories -> AppGold
+        GoalType.Duration -> AppAccent
+        GoalType.None -> AppMuted
+    }
+    val lastFinishedSession = remember(state.sessions) { latestFinishedSession(state.sessions) }
+    val lastActualText = if (goal.isActive) {
+        lastFinishedSession
+            ?.let { sessionActualValue(it, goal.type) }
+            ?.let { formatRaceMetric(goal.type, it, unitSystem) }
+    } else {
+        null
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = AppSurface,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+    ) {
+        Column(
+            Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        stringResource(R.string.home_planner_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = AppInk,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    MiniChip(chipText, accent)
+                }
+            }
+            if (goal.isActive) {
+                HomeGoalStepper(
+                    target = target,
+                    accent = accent,
+                    onAdjustGoal = onAdjustGoal,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PlannerReferenceRow(
+                        label = sourceText,
+                        value = target,
+                        accent = accent,
+                    )
+                    PlannerReferenceRow(
+                        label = stringResource(R.string.goal_previous_short),
+                        value = lastActualText ?: "--",
+                        accent = AppMuted,
+                    )
+                }
+            } else {
+                Text(
+                    target,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Button(
+                onClick = onOpenRide,
+                enabled = state.connection.isConnected,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppAccent,
+                    disabledContainerColor = AppSurfaceMuted,
+                    disabledContentColor = AppMuted,
+                ),
+            ) {
+                Text(
+                    stringResource(
+                        if (state.connection.isConnected) R.string.go_to_workout else R.string.connect_trainer_to_workout,
+                    ),
+                    color = if (state.connection.isConnected) AppLightCardText else AppMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeGoalStepper(
+    target: String,
+    accent: Color,
+    onAdjustGoal: (Int) -> Unit,
+) {
+    val view = LocalView.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GoalStepperButton(
+            text = "-",
+            contentDescription = stringResource(R.string.decrease_goal),
+            accent = accent,
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                onAdjustGoal(-1)
+            },
+        )
+        Text(
+            target,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.headlineMedium,
+            color = accent,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        GoalStepperButton(
+            text = "+",
+            contentDescription = stringResource(R.string.increase_goal),
+            accent = accent,
+            onClick = {
+                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                onAdjustGoal(1)
+            },
+        )
+    }
+}
+
+@Composable
+private fun GoalStepperButton(
+    text: String,
+    contentDescription: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(44.dp)
+            .semantics {
+                this.contentDescription = contentDescription
+                role = Role.Button
+            }
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = CircleShape,
+        color = accent.copy(alpha = 0.10f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.56f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text,
+                style = MaterialTheme.typography.titleLarge,
+                color = accent,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlannerReferenceRow(
+    label: String,
+    value: String,
+    accent: Color,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = AppMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                value,
+                style = MaterialTheme.typography.labelLarge,
+                color = AppInk,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onConnectOther,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = AppAccent),
-        ) {
-            Text(stringResource(R.string.connect_other_trainer), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(accent.copy(alpha = 0.28f)),
+        )
     }
 }
 
-@Composable
-private fun HomeAchievementsPanel(state: TrackerUiState) {
-    val unitSystem = state.settings.unitSystem
-    val baseline = state.personalBaseline
-    val medianDuration = baseline.medianDistanceDurationSeconds ?: baseline.medianCaloriesDurationSeconds
-    Panel {
-        Text(
-            stringResource(R.string.home_achievements),
-            style = MaterialTheme.typography.titleMedium,
-            color = AppInk,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SummaryStat(
-                stringResource(R.string.days_streak),
-                baseline.currentStreakDays.toString(),
-                Modifier.weight(1f),
-                prominentValue = true,
-            )
-            SummaryStat(
-                stringResource(R.string.median_distance),
-                MeasurementFormatter.distance(baseline.medianDistanceMeters, unitSystem),
-                Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SummaryStat(stringResource(R.string.median_calories), baseline.medianCalories?.toString() ?: "-", Modifier.weight(1f))
-            SummaryStat(
-                stringResource(R.string.median_duration),
-                medianDuration?.let(::formatDurationSeconds) ?: "-",
-                Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomeHistoryPanel(state: TrackerUiState, onOpenHistory: () -> Unit) {
-    val unitSystem = state.settings.unitSystem
-    val finishedSessions = state.sessions.filter { it.state == "finished" }
-    val savedRideCount = finishedSessions.size
-    val totalDistance = finishedSessions.mapNotNull { it.totalDistanceMeters }.sum().takeIf { it > 0.0 }
-
-    Panel(
-        modifier = Modifier.clickable(role = Role.Button, onClick = onOpenHistory),
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.view_history),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                color = AppInk,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(stringResource(R.string.open_history), color = AppAccent, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SummaryStat(
-                stringResource(R.string.saved_rides),
-                savedRideCount.toString(),
-                Modifier.weight(1f),
-                prominentValue = true,
-            )
-            SummaryStat(
-                stringResource(R.string.total_distance),
-                MeasurementFormatter.distance(totalDistance, unitSystem),
-                Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.home_history_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = AppMuted,
-        )
-    }
+private fun latestFinishedSession(sessions: List<WorkoutSessionEntity>): WorkoutSessionEntity? {
+    return sessions
+        .filter { it.state == "finished" && it.endTimeMillis != null }
+        .maxByOrNull { it.endTimeMillis ?: Long.MIN_VALUE }
 }
 
 @Composable
@@ -2046,11 +2447,7 @@ private fun PlannedGoalPanel(state: TrackerUiState, onEditGoal: () -> Unit) {
     val unitSystem = state.settings.unitSystem
     val target = goal.targetValue?.let { formatRaceMetric(goal.type, it, unitSystem) }
         ?: stringResource(R.string.goal_free_ride)
-    val source = when {
-        !goal.isActive -> stringResource(R.string.goal_not_set)
-        goal.source == GoalSource.Manual -> stringResource(R.string.goal_manual)
-        else -> stringResource(R.string.goal_from_median)
-    }
+    val source = goalSourceLabel(goal)
     Panel {
         Row(
             Modifier.fillMaxWidth(),
@@ -2162,6 +2559,7 @@ private fun WorkoutContextStrip(state: TrackerUiState) {
         goal = state.workoutGoal,
         currentDistanceMeters = state.currentMetrics.distanceMeters,
         currentCalories = state.currentMetrics.calories,
+        elapsedSeconds = state.activeElapsedSeconds,
     )
     val statusText = when {
         state.isWorkoutPaused -> stringResource(R.string.paused)
@@ -2176,6 +2574,7 @@ private fun WorkoutContextStrip(state: TrackerUiState) {
     val baseline = state.personalBaseline
     val paceText = when {
         goalProgress.completed -> stringResource(R.string.race_goal_reached)
+        state.workoutGoal.type == GoalType.Duration -> stringResource(R.string.duration_goal_active)
         state.ghostRace.isActive && state.ghostRace.zone == RaceZone.Ahead -> stringResource(R.string.race_on_pace)
         state.ghostRace.isActive && state.ghostRace.zone == RaceZone.Behind -> stringResource(R.string.race_behind)
         state.ghostRace.isActive -> stringResource(R.string.race_steady)
@@ -2237,12 +2636,18 @@ private fun RaceTrackPanel(
         goal = goal,
         currentDistanceMeters = state.currentMetrics.distanceMeters,
         currentCalories = state.currentMetrics.calories,
+        elapsedSeconds = state.activeElapsedSeconds,
     )
-    val color = raceColor(race, goalProgress.completed)
+    val color = when {
+        goal.type == GoalType.Duration && goalProgress.completed -> AppGold
+        goal.type == GoalType.Duration && goal.isActive -> AppAccent
+        else -> raceColor(race, goalProgress.completed)
+    }
     val raceAlpha = if (isHrDanger(state)) 0.42f else 1f
     val unitSystem = state.settings.unitSystem
     val targetText = goal.targetValue?.let { formatRaceMetric(goal.type, it, unitSystem) }
         ?: stringResource(R.string.no_goal)
+    val isDurationGoal = goal.type == GoalType.Duration
 
     Card(
         modifier = Modifier.fillMaxWidth().alpha(raceAlpha),
@@ -2259,13 +2664,19 @@ private fun RaceTrackPanel(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.race_with_shadow),
+                        stringResource(if (isDurationGoal) R.string.goal_progress_title else R.string.race_with_shadow),
                         style = MaterialTheme.typography.titleMedium,
                         color = AppInk,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        stringResource(R.string.race_shadow_explainer),
+                        stringResource(
+                            if (isDurationGoal) {
+                                R.string.duration_goal_progress_explainer
+                            } else {
+                                R.string.race_shadow_explainer
+                            },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = AppMuted,
                         maxLines = 1,
@@ -2296,13 +2707,13 @@ private fun RaceTrackPanel(
                 color = color,
             )
             RaceProgressLine(
-                label = stringResource(R.string.your_median),
-                value = if (race.isActive) {
-                    formatRaceMetric(goal.type, race.ghostValue, unitSystem)
-                } else {
-                    stringResource(R.string.need_more_rides)
+                label = stringResource(if (isDurationGoal) R.string.goal_target else R.string.your_median),
+                value = when {
+                    isDurationGoal -> targetText
+                    race.isActive -> formatRaceMetric(goal.type, race.ghostValue, unitSystem)
+                    else -> stringResource(R.string.need_more_rides)
                 },
-                progress = race.ghostProgress,
+                progress = if (isDurationGoal && goal.isActive) 1f else race.ghostProgress,
                 color = AppMuted,
             )
             Surface(
@@ -2372,6 +2783,7 @@ private fun PrimaryMetricCard(
             ?.let { MeasurementFormatter.distanceValue(it, unitSystem).format(2) }
             ?: "-"
         GoalType.Calories -> state.currentMetrics.calories?.toString() ?: "-"
+        GoalType.Duration -> formatDurationSeconds(state.activeElapsedSeconds)
         GoalType.None -> state.currentMetrics.distanceMeters
             ?.let { MeasurementFormatter.distanceValue(it, unitSystem).format(2) }
             ?: "-"
@@ -2379,17 +2791,15 @@ private fun PrimaryMetricCard(
     val unit = when (goal.type) {
         GoalType.Distance, GoalType.None -> MeasurementFormatter.distanceUnit(unitSystem)
         GoalType.Calories -> "kcal"
+        GoalType.Duration -> ""
     }
     val label = when (goal.type) {
         GoalType.Distance -> stringResource(R.string.distance_goal)
         GoalType.Calories -> stringResource(R.string.calories_goal)
+        GoalType.Duration -> stringResource(R.string.duration_goal)
         GoalType.None -> stringResource(R.string.no_goal)
     }
-    val source = when {
-        !goal.isActive -> stringResource(R.string.goal_not_set)
-        goal.source == GoalSource.Manual -> stringResource(R.string.goal_manual)
-        else -> stringResource(R.string.goal_from_median)
-    }
+    val source = goalSourceLabel(goal)
     val accent = if (goal.isActive) AppAccent else AppCyan
 
     Card(
@@ -2804,7 +3214,8 @@ private fun GoalOverrideSheet(
         stringResource(R.string.goal_reset_to, formatRaceMetric(selectedType, it, unitSystem))
     } ?: stringResource(R.string.need_more_rides)
     val customErrorMessage = customError?.let { stringResource(goalInputErrorStringRes(it)) }
-    val confirmEnabled = customError == null && (draftGoal.isActive || draftGoal.type == GoalType.None)
+    val confirmEnabled = customError == null &&
+        (draftGoal.isActive || draftGoal.type == GoalType.None)
     val stepOneTitle = when (selectedType) {
         GoalType.Distance -> stringResource(
             R.string.add_distance_unit,
@@ -2812,6 +3223,7 @@ private fun GoalOverrideSheet(
             MeasurementFormatter.distanceUnit(unitSystem),
         )
         GoalType.Calories -> stringResource(R.string.add_fifty_kcal)
+        GoalType.Duration -> stringResource(R.string.add_five_min)
         GoalType.None -> stringResource(
             R.string.add_distance_unit,
             "1",
@@ -2825,6 +3237,7 @@ private fun GoalOverrideSheet(
             MeasurementFormatter.distanceUnit(unitSystem),
         )
         GoalType.Calories -> stringResource(R.string.add_hundred_kcal)
+        GoalType.Duration -> stringResource(R.string.add_ten_min)
         GoalType.None -> stringResource(
             R.string.add_distance_unit,
             "2",
@@ -2834,12 +3247,23 @@ private fun GoalOverrideSheet(
     val stepOneSubtitle = when (selectedType) {
         GoalType.Distance -> stringResource(R.string.goal_step_small_distance)
         GoalType.Calories -> stringResource(R.string.goal_step_small_calories)
+        GoalType.Duration -> stringResource(R.string.goal_step_small_duration)
         GoalType.None -> ""
     }
     val stepTwoSubtitle = when (selectedType) {
         GoalType.Distance -> stringResource(R.string.goal_step_large_distance)
         GoalType.Calories -> stringResource(R.string.goal_step_large_calories)
+        GoalType.Duration -> stringResource(R.string.goal_step_large_duration)
         GoalType.None -> ""
+    }
+    val medianTileEnabled = medianGoal != null
+    val confirmNewGoalText = stringResource(R.string.confirm_new_goal)
+
+    fun selectType(type: GoalType) {
+        selectedType = type
+        draftGoal = medianGoalForType(type, state.personalBaseline)
+            ?: WorkoutGoal.none(GoalSource.Manual)
+        resetCustomInput()
     }
 
     Column(
@@ -2877,6 +3301,11 @@ private fun GoalOverrideSheet(
         GoalCustomValueControl(
             type = selectedType,
             unitSystem = unitSystem,
+            customValueHint = if (selectedType == GoalType.Duration) {
+                stringResource(R.string.goal_custom_duration_hint)
+            } else {
+                stringResource(R.string.goal_custom_value_hint)
+            },
             expanded = customExpanded,
             input = customInput,
             errorMessage = customErrorMessage,
@@ -2898,12 +3327,7 @@ private fun GoalOverrideSheet(
                     selected = selectedType == GoalType.Distance,
                     modifier = Modifier.weight(1f),
                     onClick = {
-                        withHaptic {
-                            selectedType = GoalType.Distance
-                            draftGoal = medianGoalForType(GoalType.Distance, state.personalBaseline)
-                                ?: WorkoutGoal.none(GoalSource.Manual)
-                            resetCustomInput()
-                        }
+                        withHaptic { selectType(GoalType.Distance) }
                     },
                 )
                 GoalTypeTab(
@@ -2911,12 +3335,15 @@ private fun GoalOverrideSheet(
                     selected = selectedType == GoalType.Calories,
                     modifier = Modifier.weight(1f),
                     onClick = {
-                        withHaptic {
-                            selectedType = GoalType.Calories
-                            draftGoal = medianGoalForType(GoalType.Calories, state.personalBaseline)
-                                ?: WorkoutGoal.none(GoalSource.Manual)
-                            resetCustomInput()
-                        }
+                        withHaptic { selectType(GoalType.Calories) }
+                    },
+                )
+                GoalTypeTab(
+                    text = stringResource(R.string.duration),
+                    selected = selectedType == GoalType.Duration,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        withHaptic { selectType(GoalType.Duration) }
                     },
                 )
             }
@@ -2929,13 +3356,7 @@ private fun GoalOverrideSheet(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             withHaptic {
-                                draftGoal = incrementDraftGoal(
-                                    draftGoal = draftGoal,
-                                    state = state,
-                                    type = selectedType,
-                                    distanceAmount = 1.0,
-                                    calories = 50,
-                                )
+                                draftGoal = incrementDraftGoal(draftGoal, state, selectedType, 1.0, 50, 5L * 60L)
                                 resetCustomInput()
                             }
                         },
@@ -2943,8 +3364,8 @@ private fun GoalOverrideSheet(
                     GoalActionTile(
                         title = stringResource(R.string.use_median),
                         subtitle = medianSubtitle,
-                        enabled = medianGoal != null,
-                        emphasized = medianGoal != null,
+                        enabled = medianTileEnabled,
+                        emphasized = medianTileEnabled,
                         modifier = Modifier.weight(1f),
                         onClick = {
                             medianGoal?.let { goal ->
@@ -2963,13 +3384,7 @@ private fun GoalOverrideSheet(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             withHaptic {
-                                draftGoal = incrementDraftGoal(
-                                    draftGoal = draftGoal,
-                                    state = state,
-                                    type = selectedType,
-                                    distanceAmount = 2.0,
-                                    calories = 100,
-                                )
+                                draftGoal = incrementDraftGoal(draftGoal, state, selectedType, 2.0, 100, 10L * 60L)
                                 resetCustomInput()
                             }
                         },
@@ -2988,8 +3403,6 @@ private fun GoalOverrideSheet(
                 }
             }
         }
-
-        val confirmNewGoalText = stringResource(R.string.confirm_new_goal)
 
         Button(
             onClick = {
@@ -3149,6 +3562,7 @@ private fun GoalActionTile(
 private fun GoalCustomValueControl(
     type: GoalType,
     unitSystem: UnitSystem,
+    customValueHint: String,
     expanded: Boolean,
     input: String,
     errorMessage: String?,
@@ -3156,7 +3570,6 @@ private fun GoalCustomValueControl(
     onInputChange: (String) -> Unit,
 ) {
     val customValueText = stringResource(R.string.goal_custom_value)
-    val customValueHint = stringResource(R.string.goal_custom_value_hint)
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -3207,6 +3620,7 @@ private fun GoalCustomValueControl(
                 when (type) {
                     GoalType.Distance -> MeasurementFormatter.distanceUnit(unitSystem)
                     GoalType.Calories -> "kcal"
+                    GoalType.Duration -> stringResource(R.string.minutes_short)
                     GoalType.None -> ""
                 },
                 color = AppCyan,
@@ -3231,6 +3645,7 @@ private fun GoalCustomValueControl(
                     when (type) {
                         GoalType.Distance -> stringResource(R.string.distance_goal)
                         GoalType.Calories -> stringResource(R.string.calories_goal)
+                        GoalType.Duration -> stringResource(R.string.duration_goal)
                         GoalType.None -> stringResource(R.string.goal)
                     },
                 )
@@ -3238,7 +3653,11 @@ private fun GoalCustomValueControl(
             isError = errorMessage != null,
             singleLine = true,
             keyboardOptions = KeyboardOptions(
-                keyboardType = if (type == GoalType.Distance) KeyboardType.Decimal else KeyboardType.Number,
+                keyboardType = when (type) {
+                    GoalType.Distance -> KeyboardType.Decimal
+                    GoalType.Duration -> KeyboardType.Text
+                    else -> KeyboardType.Number
+                },
                 imeAction = ImeAction.Done,
             ),
             supportingText = errorMessage?.let { message ->
@@ -3252,6 +3671,7 @@ private fun goalInputErrorStringRes(error: GoalInputError): Int {
     return when (error) {
         GoalInputError.Distance -> R.string.goal_custom_invalid_distance
         GoalInputError.Calories -> R.string.goal_custom_invalid_calories
+        GoalInputError.Duration -> R.string.goal_custom_invalid_duration
     }
 }
 
@@ -3267,6 +3687,10 @@ private fun medianGoalForType(type: GoalType, baseline: PersonalBaseline): Worko
         } else {
             null
         }
+        GoalType.Duration -> {
+            val duration = baseline.medianDistanceDurationSeconds ?: baseline.medianCaloriesDurationSeconds
+            duration?.let { WorkoutGoal.duration(it, GoalSource.Median) }
+        }
         GoalType.None -> null
     }
 }
@@ -3277,6 +3701,7 @@ private fun incrementDraftGoal(
     type: GoalType,
     distanceAmount: Double,
     calories: Int,
+    durationSeconds: Long,
 ): WorkoutGoal {
     return when (type) {
         GoalType.Distance -> {
@@ -3297,6 +3722,14 @@ private fun incrementDraftGoal(
                 else -> state.personalBaseline.medianCalories
             } ?: 0
             WorkoutGoal.calories(base + calories, GoalSource.Manual)
+        }
+        GoalType.Duration -> {
+            val base = when {
+                draftGoal.type == GoalType.Duration -> draftGoal.targetDurationSeconds
+                state.activeElapsedSeconds > 0L -> state.activeElapsedSeconds
+                else -> state.personalBaseline.medianDurationSeconds
+            } ?: 0L
+            WorkoutGoal.duration(base + durationSeconds, GoalSource.Manual)
         }
         GoalType.None -> draftGoal
     }
@@ -4270,8 +4703,22 @@ private fun raceDeltaText(state: TrackerUiState): String {
         goal = goal,
         currentDistanceMeters = state.currentMetrics.distanceMeters,
         currentCalories = state.currentMetrics.calories,
+        elapsedSeconds = state.activeElapsedSeconds,
     )
     if (!goal.isActive) return stringResource(R.string.goal_riding_without_goal)
+    if (goal.type == GoalType.Duration) {
+        return if (goalProgress.completed) {
+            stringResource(
+                R.string.goal_completed_generic,
+                formatRaceMetric(goal.type, goalProgress.targetValue, unitSystem),
+            )
+        } else {
+            stringResource(
+                R.string.duration_goal_remaining,
+                formatRaceMetric(goal.type, goalProgress.remainingValue, unitSystem),
+            )
+        }
+    }
     if (!race.isActive) {
         return if (goalProgress.completed) {
             stringResource(
@@ -4325,6 +4772,7 @@ private fun formatRaceMetric(
     return when (type) {
         GoalType.Distance -> MeasurementFormatter.distance(value, unitSystem, 2)
         GoalType.Calories -> "${value.format(0)} kcal"
+        GoalType.Duration -> formatDurationSeconds(value.toLong())
         GoalType.None -> value.format(0)
     }
 }
@@ -4337,6 +4785,10 @@ private fun sessionActualValue(session: WorkoutSessionEntity, type: GoalType): D
     return when (type) {
         GoalType.Distance -> session.totalDistanceMeters
         GoalType.Calories -> session.totalCalories?.toDouble()
+        GoalType.Duration -> {
+            val end = session.endTimeMillis ?: return null
+            ((end - session.startTimeMillis) / 1000).coerceAtLeast(0L).toDouble()
+        }
         GoalType.None -> null
     }
 }
@@ -4345,6 +4797,7 @@ private fun sessionMedianValue(session: WorkoutSessionEntity, type: GoalType): D
     return when (type) {
         GoalType.Distance -> session.baselineMedianDistanceMeters
         GoalType.Calories -> session.baselineMedianCalories?.toDouble()
+        GoalType.Duration -> session.baselineMedianDurationSeconds?.toDouble()
         GoalType.None -> null
     }
 }
@@ -4353,6 +4806,7 @@ private fun sessionTargetValue(session: WorkoutSessionEntity, type: GoalType): D
     return when (type) {
         GoalType.Distance -> session.goalTargetDistanceMeters
         GoalType.Calories -> session.goalTargetCalories?.toDouble()
+        GoalType.Duration -> session.goalTargetDurationSeconds?.toDouble()
         GoalType.None -> null
     }
 }

@@ -132,10 +132,239 @@ class RaceModelsTest {
         assertTrue(progress.completed)
     }
 
+    @Test
+    fun durationGoalProgressUsesElapsedSecondsWithoutMedianGhost() {
+        val baseline = PersonalBaseline(
+            medianDistanceMeters = 10_000.0,
+            medianDistanceDurationSeconds = 2_400L,
+        )
+        val goal = WorkoutGoal.duration(1_800L, GoalSource.Manual)
+
+        val ghost = RaceCalculator.ghostRaceState(
+            goal = goal,
+            baseline = baseline,
+            elapsedSeconds = 900L,
+            currentDistanceMeters = 5_000.0,
+            currentCalories = 120,
+        )
+        val progress = RaceCalculator.goalProgressState(
+            goal = goal,
+            currentDistanceMeters = 5_000.0,
+            currentCalories = 120,
+            elapsedSeconds = 900L,
+        )
+
+        assertFalse(ghost.isActive)
+        assertEquals(900.0, progress.userValue, 0.001)
+        assertEquals(1_800.0, progress.targetValue, 0.001)
+        assertEquals(0.5f, progress.progress, 0.001f)
+        assertFalse(progress.completed)
+    }
+
+    @Test
+    fun durationGoalProgressCompletesAtTarget() {
+        val goal = WorkoutGoal.duration(1_800L, GoalSource.Manual)
+
+        val progress = RaceCalculator.goalProgressState(
+            goal = goal,
+            currentDistanceMeters = null,
+            currentCalories = null,
+            elapsedSeconds = 1_800L,
+        )
+
+        assertEquals(1.0f, progress.progress, 0.001f)
+        assertEquals(0.0, progress.remainingValue, 0.001)
+        assertTrue(progress.completed)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutReusesPersistedDistanceTarget() {
+        val today = LocalDate.of(2026, 6, 12)
+        val latest = session(day = today.minusDays(1), distance = 10_000.0, calories = 220, duration = 1_500)
+            .copy(
+                goalType = GoalType.Distance.storageValue,
+                goalSource = GoalSource.Manual.storageValue,
+                goalTargetDistanceMeters = 12_500.0,
+            )
+
+        val goal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(latest),
+            baseline = PersonalBaseline(),
+        )
+
+        assertEquals(GoalType.Distance, goal.type)
+        assertEquals(GoalSource.Previous, goal.source)
+        assertEquals(12_500.0, goal.targetDistanceMeters ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutReusesPersistedCaloriesTarget() {
+        val today = LocalDate.of(2026, 6, 12)
+        val latest = session(day = today.minusDays(1), distance = 10_000.0, calories = 220, duration = 1_500)
+            .copy(
+                goalType = GoalType.Calories.storageValue,
+                goalSource = GoalSource.Manual.storageValue,
+                goalTargetCalories = 320,
+            )
+
+        val goal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(latest),
+            baseline = PersonalBaseline(),
+        )
+
+        assertEquals(GoalType.Calories, goal.type)
+        assertEquals(GoalSource.Previous, goal.source)
+        assertEquals(320, goal.targetCalories)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutReusesPersistedDurationTarget() {
+        val today = LocalDate.of(2026, 6, 12)
+        val older = session(day = today.minusDays(2), distance = 8_000.0, calories = 180, duration = 1_200)
+        val latest = session(day = today.minusDays(1), distance = 10_000.0, calories = 220, duration = 1_500)
+            .copy(
+                goalType = GoalType.Duration.storageValue,
+                goalSource = GoalSource.Manual.storageValue,
+                goalTargetDurationSeconds = 1_800L,
+            )
+
+        val goal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(older, latest),
+            baseline = RaceCalculator.buildPersonalBaseline(listOf(older, latest), zoneId = zone),
+        )
+
+        assertEquals(GoalType.Duration, goal.type)
+        assertEquals(GoalSource.Previous, goal.source)
+        assertEquals(1_800L, goal.targetDurationSeconds)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutUsesLastMetricWhenNoStoredGoalExists() {
+        val today = LocalDate.of(2026, 6, 12)
+        val latest = session(day = today.minusDays(1), distance = 10_000.0, calories = 220, duration = 1_500)
+
+        val goal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(latest),
+            baseline = PersonalBaseline(),
+        )
+
+        assertEquals(GoalType.Distance, goal.type)
+        assertEquals(GoalSource.Previous, goal.source)
+        assertEquals(10_000.0, goal.targetDistanceMeters ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutFallsBackToActualCaloriesThenDuration() {
+        val today = LocalDate.of(2026, 6, 12)
+        val caloriesOnly = session(
+            day = today.minusDays(2),
+            distance = null,
+            calories = 220,
+            duration = 1_500,
+        )
+        val durationOnly = session(
+            day = today.minusDays(1),
+            distance = null,
+            calories = null,
+            duration = 1_800,
+        )
+
+        val caloriesGoal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(caloriesOnly),
+            baseline = PersonalBaseline(),
+        )
+        val durationGoal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(durationOnly),
+            baseline = PersonalBaseline(),
+        )
+
+        assertEquals(GoalType.Calories, caloriesGoal.type)
+        assertEquals(220, caloriesGoal.targetCalories)
+        assertEquals(GoalType.Duration, durationGoal.type)
+        assertEquals(1_800L, durationGoal.targetDurationSeconds)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutIgnoresRunningSessions() {
+        val today = LocalDate.of(2026, 6, 12)
+        val finished = session(day = today.minusDays(2), distance = 6_000.0, calories = 120, duration = 900)
+        val running = session(day = today.minusDays(1), distance = 20_000.0, calories = 500, duration = 2_000)
+            .copy(state = "running", endTimeMillis = null)
+
+        val goal = RaceCalculator.defaultGoalFromLastWorkout(
+            sessions = listOf(running, finished),
+            baseline = PersonalBaseline(),
+        )
+
+        assertEquals(GoalType.Distance, goal.type)
+        assertEquals(6_000.0, goal.targetDistanceMeters ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun defaultGoalFromLastWorkoutFallsBackToMedianThenNone() {
+        val distanceBaseline = PersonalBaseline(
+            medianDistanceMeters = 7_000.0,
+            medianDistanceDurationSeconds = 1_200L,
+        )
+
+        val medianGoal = RaceCalculator.defaultGoalFromLastWorkout(emptyList(), distanceBaseline)
+        val noneGoal = RaceCalculator.defaultGoalFromLastWorkout(emptyList(), PersonalBaseline())
+
+        assertEquals(GoalType.Distance, medianGoal.type)
+        assertEquals(7_000.0, medianGoal.targetDistanceMeters ?: 0.0, 0.001)
+        assertFalse(noneGoal.isActive)
+    }
+
+    @Test
+    fun adjustGoalChangesDistanceByStepAndClampsToMinimum() {
+        val goal = WorkoutGoal.distance(1_000.0, GoalSource.Median)
+
+        val increased = RaceCalculator.adjustGoal(goal, 1, distanceStepMeters = 100.0)
+        val clamped = RaceCalculator.adjustGoal(goal, -20, distanceStepMeters = 100.0)
+
+        assertEquals(GoalSource.Manual, increased.source)
+        assertEquals(1_100.0, increased.targetDistanceMeters ?: 0.0, 0.001)
+        assertEquals(100.0, clamped.targetDistanceMeters ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun adjustGoalChangesCaloriesByStepAndClampsToMinimum() {
+        val goal = WorkoutGoal.calories(25, GoalSource.Median)
+
+        val decreased = RaceCalculator.adjustGoal(goal, -1, distanceStepMeters = 100.0, caloriesStep = 5)
+        val clamped = RaceCalculator.adjustGoal(goal, -20, distanceStepMeters = 100.0, caloriesStep = 5)
+
+        assertEquals(GoalSource.Manual, decreased.source)
+        assertEquals(20, decreased.targetCalories)
+        assertEquals(5, clamped.targetCalories)
+    }
+
+    @Test
+    fun adjustGoalChangesDurationByStepAndClampsToMinimum() {
+        val goal = WorkoutGoal.duration(180L, GoalSource.Median)
+
+        val increased = RaceCalculator.adjustGoal(goal, 1, distanceStepMeters = 100.0, durationStepSeconds = 60L)
+        val clamped = RaceCalculator.adjustGoal(goal, -20, distanceStepMeters = 100.0, durationStepSeconds = 60L)
+
+        assertEquals(GoalSource.Manual, increased.source)
+        assertEquals(240L, increased.targetDurationSeconds)
+        assertEquals(60L, clamped.targetDurationSeconds)
+    }
+
+    @Test
+    fun adjustGoalLeavesNoGoalUnchanged() {
+        val goal = WorkoutGoal.none()
+
+        val adjusted = RaceCalculator.adjustGoal(goal, 1, distanceStepMeters = 100.0)
+
+        assertFalse(adjusted.isActive)
+        assertEquals(goal, adjusted)
+    }
+
     private fun session(
         day: LocalDate,
-        distance: Double,
-        calories: Int,
+        distance: Double?,
+        calories: Int?,
         duration: Long,
     ): WorkoutSessionEntity {
         val start = day.atTime(9, 0).atZone(zone).toInstant().toEpochMilli()

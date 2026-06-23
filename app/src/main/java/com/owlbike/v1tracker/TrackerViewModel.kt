@@ -25,6 +25,7 @@ import com.owlbike.v1tracker.race.WorkoutGoal
 import com.owlbike.v1tracker.settings.AppSettings
 import com.owlbike.v1tracker.settings.AppSettingsRepository
 import com.owlbike.v1tracker.settings.LanguageMode
+import com.owlbike.v1tracker.settings.MeasurementFormatter
 import com.owlbike.v1tracker.settings.ThemeMode
 import com.owlbike.v1tracker.settings.UnitSystem
 import kotlinx.coroutines.delay
@@ -109,7 +110,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                     val goal = when {
                         state.isWorkoutRunning -> state.workoutGoal
                         state.workoutGoal.source == GoalSource.Manual -> state.workoutGoal
-                        else -> RaceCalculator.defaultGoal(baseline, state.workoutGoal.type)
+                        state.workoutGoal.source == GoalSource.Median &&
+                            state.workoutGoal.type != GoalType.None -> {
+                            RaceCalculator.defaultGoal(baseline, state.workoutGoal.type)
+                        }
+                        else -> RaceCalculator.defaultGoalFromLastWorkout(sessions, baseline)
                     }
                     val knownWeekStarts = knownHistoryWeekStarts(sessions)
                     val expandedWeekStarts = if (state.historyExpansionInitialized) {
@@ -294,8 +299,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         val state = _uiState.value
         val connection = state.connection
         val baseline = state.personalBaseline
-        val goal = state.workoutGoal.takeIf { it.isActive }
-            ?: RaceCalculator.defaultGoal(baseline)
+        val goal = when {
+            state.workoutGoal.isActive -> state.workoutGoal
+            state.workoutGoal.source == GoalSource.Manual -> state.workoutGoal
+            else -> RaceCalculator.defaultGoalFromLastWorkout(state.sessions, baseline)
+        }
         val baselineDuration = RaceCalculator.baselineDurationSeconds(goal, baseline)
         val session = WorkoutSessionEntity(
             id = UUID.randomUUID().toString(),
@@ -314,6 +322,7 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             goalSource = goal.source.storageValue,
             goalTargetDistanceMeters = goal.targetDistanceMeters,
             goalTargetCalories = goal.targetCalories,
+            goalTargetDurationSeconds = goal.targetDurationSeconds,
             baselineMedianDistanceMeters = baseline.medianDistanceMeters,
             baselineMedianCalories = baseline.medianCalories,
             baselineMedianDurationSeconds = baselineDuration,
@@ -437,6 +446,19 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 RaceCalculator.defaultGoal(state.personalBaseline, type)
             }
             state.copy(workoutGoal = goal).withUpdatedRace()
+        }
+    }
+
+    fun adjustWorkoutGoal(direction: Int) {
+        _uiState.update { state ->
+            val distanceStepMeters = MeasurementFormatter.distanceInputToMeters(0.1, state.settings.unitSystem)
+            state.copy(
+                workoutGoal = RaceCalculator.adjustGoal(
+                    goal = state.workoutGoal,
+                    direction = direction,
+                    distanceStepMeters = distanceStepMeters,
+                ),
+            ).withUpdatedRace()
         }
     }
 
@@ -608,8 +630,11 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
             while (activeSession != null) {
                 delay(1_000)
                 _uiState.update { state ->
-                    if (state.isWorkoutRunning && !state.isWorkoutPaused) {
-                        state.copy(activeElapsedSeconds = state.activeElapsedSeconds + 1).withUpdatedRace()
+                    val session = activeSession
+                    if (state.isWorkoutRunning && session != null) {
+                        val elapsedSeconds = ((System.currentTimeMillis() - session.startTimeMillis) / 1000)
+                            .coerceAtLeast(0L)
+                        state.copy(activeElapsedSeconds = elapsedSeconds).withUpdatedRace()
                     } else {
                         state.withUpdatedRace()
                     }

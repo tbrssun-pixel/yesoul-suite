@@ -23,6 +23,7 @@ data class WorkoutSessionEntity(
     val goalSource: String? = null,
     val goalTargetDistanceMeters: Double? = null,
     val goalTargetCalories: Int? = null,
+    val goalTargetDurationSeconds: Long? = null,
     val baselineMedianDistanceMeters: Double? = null,
     val baselineMedianCalories: Int? = null,
     val baselineMedianDurationSeconds: Long? = null,

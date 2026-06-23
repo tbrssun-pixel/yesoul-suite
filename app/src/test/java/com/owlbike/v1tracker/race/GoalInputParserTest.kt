@@ -28,10 +28,23 @@ class GoalInputParserTest {
     }
 
     @Test
+    fun parsesDurationMinutesAndMinuteSecondsInput() {
+        val minutes = GoalInputParser.parse(GoalType.Duration, "25").goal
+        val minuteSeconds = GoalInputParser.parse(GoalType.Duration, "12:30").goal
+
+        assertEquals(GoalType.Duration, minutes?.type)
+        assertEquals(GoalSource.Manual, minutes?.source)
+        assertEquals(1_500L, minutes?.targetDurationSeconds)
+        assertEquals(750L, minuteSeconds?.targetDurationSeconds)
+        assertEquals("12:30", GoalInputParser.inputText(minuteSeconds!!, GoalType.Duration))
+    }
+
+    @Test
     fun rejectsInvalidCustomInputsWithoutGoal() {
         val empty = GoalInputParser.parse(GoalType.Distance, "")
         val zero = GoalInputParser.parse(GoalType.Distance, "0")
         val negative = GoalInputParser.parse(GoalType.Calories, "-10")
+        val invalidDuration = GoalInputParser.parse(GoalType.Duration, "3:99")
 
         assertNull(empty.goal)
         assertEquals(GoalInputError.Distance, empty.error)
@@ -39,6 +52,8 @@ class GoalInputParserTest {
         assertEquals(GoalInputError.Distance, zero.error)
         assertNull(negative.goal)
         assertEquals(GoalInputError.Calories, negative.error)
+        assertNull(invalidDuration.goal)
+        assertEquals(GoalInputError.Duration, invalidDuration.error)
     }
 
     @Test

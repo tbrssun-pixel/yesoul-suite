@@ -11,6 +11,7 @@ import kotlin.math.roundToInt
 enum class GoalType(val storageValue: String) {
     Distance("distance"),
     Calories("calories"),
+    Duration("duration"),
     None("none");
 
     companion object {
@@ -22,6 +23,7 @@ enum class GoalType(val storageValue: String) {
 
 enum class GoalSource(val storageValue: String) {
     Median("median"),
+    Previous("previous"),
     Manual("manual");
 
     companion object {
@@ -42,6 +44,7 @@ data class WorkoutGoal(
     val source: GoalSource = GoalSource.Median,
     val targetDistanceMeters: Double? = null,
     val targetCalories: Int? = null,
+    val targetDurationSeconds: Long? = null,
 ) {
     val isActive: Boolean
         get() = type != GoalType.None
@@ -50,6 +53,7 @@ data class WorkoutGoal(
         get() = when (type) {
             GoalType.Distance -> targetDistanceMeters
             GoalType.Calories -> targetCalories?.toDouble()
+            GoalType.Duration -> targetDurationSeconds?.toDouble()
             GoalType.None -> null
         }
 
@@ -73,6 +77,14 @@ data class WorkoutGoal(
                 targetCalories = targetCalories.coerceAtLeast(0),
             )
         }
+
+        fun duration(targetSeconds: Long, source: GoalSource): WorkoutGoal {
+            return WorkoutGoal(
+                type = GoalType.Duration,
+                source = source,
+                targetDurationSeconds = targetSeconds.coerceAtLeast(0L),
+            )
+        }
     }
 }
 
@@ -93,6 +105,12 @@ data class PersonalBaseline(
 
     val hasCaloriesBaseline: Boolean
         get() = medianCalories != null && medianCaloriesDurationSeconds != null
+
+    val medianDurationSeconds: Long?
+        get() = medianDistanceDurationSeconds ?: medianCaloriesDurationSeconds
+
+    val hasDurationBaseline: Boolean
+        get() = medianDurationSeconds != null
 }
 
 data class GhostRaceState(
@@ -172,8 +190,14 @@ object RaceCalculator {
         baseline: PersonalBaseline,
         preferredType: GoalType = GoalType.Distance,
     ): WorkoutGoal {
+        if (preferredType == GoalType.Duration && baseline.hasDurationBaseline) {
+            return WorkoutGoal.duration(baseline.medianDurationSeconds ?: 0L, GoalSource.Median)
+        }
         if (preferredType == GoalType.Calories && baseline.hasCaloriesBaseline) {
             return WorkoutGoal.calories(baseline.medianCalories ?: 0, GoalSource.Median)
+        }
+        if (preferredType == GoalType.Distance && baseline.hasDistanceBaseline) {
+            return WorkoutGoal.distance(baseline.medianDistanceMeters ?: 0.0, GoalSource.Median)
         }
         if (baseline.hasDistanceBaseline) {
             return WorkoutGoal.distance(baseline.medianDistanceMeters ?: 0.0, GoalSource.Median)
@@ -181,13 +205,80 @@ object RaceCalculator {
         if (baseline.hasCaloriesBaseline) {
             return WorkoutGoal.calories(baseline.medianCalories ?: 0, GoalSource.Median)
         }
+        if (baseline.hasDurationBaseline) {
+            return WorkoutGoal.duration(baseline.medianDurationSeconds ?: 0L, GoalSource.Median)
+        }
         return WorkoutGoal.none()
+    }
+
+    fun defaultGoalFromLastWorkout(
+        sessions: List<WorkoutSessionEntity>,
+        baseline: PersonalBaseline,
+    ): WorkoutGoal {
+        val lastFinished = sessions
+            .filter { it.state == "finished" && it.endTimeMillis != null }
+            .maxByOrNull { it.endTimeMillis ?: Long.MIN_VALUE }
+            ?: return defaultGoal(baseline)
+
+        goalFromSession(lastFinished)?.let { return it }
+
+        lastFinished.totalDistanceMeters
+            ?.takeIf { it > 0.0 }
+            ?.let { return WorkoutGoal.distance(it, GoalSource.Previous) }
+        lastFinished.totalCalories
+            ?.takeIf { it > 0 }
+            ?.let { return WorkoutGoal.calories(it, GoalSource.Previous) }
+        durationSeconds(lastFinished)
+            ?.takeIf { it > 0L }
+            ?.let { return WorkoutGoal.duration(it, GoalSource.Previous) }
+
+        return defaultGoal(baseline)
+    }
+
+    fun adjustGoal(
+        goal: WorkoutGoal,
+        direction: Int,
+        distanceStepMeters: Double,
+        caloriesStep: Int = 5,
+        durationStepSeconds: Long = 60L,
+    ): WorkoutGoal {
+        if (direction == 0 || !goal.isActive) return goal
+
+        val normalizedDistanceStep = distanceStepMeters.takeIf { it > 0.0 } ?: 100.0
+        val normalizedCaloriesStep = caloriesStep.takeIf { it > 0 } ?: 5
+        val normalizedDurationStep = durationStepSeconds.takeIf { it > 0L } ?: 60L
+
+        return when (goal.type) {
+            GoalType.Distance -> {
+                val base = goal.targetDistanceMeters ?: normalizedDistanceStep
+                WorkoutGoal.distance(
+                    (base + normalizedDistanceStep * direction).coerceAtLeast(normalizedDistanceStep),
+                    GoalSource.Manual,
+                )
+            }
+            GoalType.Calories -> {
+                val base = goal.targetCalories ?: normalizedCaloriesStep
+                WorkoutGoal.calories(
+                    (base + normalizedCaloriesStep * direction).coerceAtLeast(normalizedCaloriesStep),
+                    GoalSource.Manual,
+                )
+            }
+            GoalType.Duration -> {
+                val base = goal.targetDurationSeconds ?: normalizedDurationStep
+                WorkoutGoal.duration(
+                    (base + normalizedDurationStep * direction).coerceAtLeast(normalizedDurationStep),
+                    GoalSource.Manual,
+                )
+            }
+            GoalType.None -> goal
+        }
     }
 
     fun baselineDurationSeconds(goal: WorkoutGoal, baseline: PersonalBaseline): Long? {
         return when (goal.type) {
             GoalType.Distance -> baseline.medianDistanceDurationSeconds
             GoalType.Calories -> baseline.medianCaloriesDurationSeconds
+            GoalType.Duration -> baseline.medianDurationSeconds
             GoalType.None -> null
         }
     }
@@ -200,10 +291,14 @@ object RaceCalculator {
         currentCalories: Int?,
         previousZone: RaceZone = RaceZone.Neutral,
     ): GhostRaceState {
+        if (goal.type == GoalType.Duration) {
+            return GhostRaceState.inactive(previousZone)
+        }
         val target = goal.targetValue?.takeIf { it > 0.0 } ?: return GhostRaceState.inactive(previousZone)
         val baselineMetric = when (goal.type) {
             GoalType.Distance -> baseline.medianDistanceMeters
             GoalType.Calories -> baseline.medianCalories?.toDouble()
+            GoalType.Duration -> null
             GoalType.None -> null
         }?.takeIf { it > 0.0 } ?: return GhostRaceState.inactive(previousZone)
         val baselineDuration = baselineDurationSeconds(goal, baseline)
@@ -212,6 +307,7 @@ object RaceCalculator {
         val userValue = when (goal.type) {
             GoalType.Distance -> currentDistanceMeters ?: 0.0
             GoalType.Calories -> currentCalories?.toDouble() ?: 0.0
+            GoalType.Duration -> 0.0
             GoalType.None -> 0.0
         }.coerceAtLeast(0.0)
         val ghostCap = min(baselineMetric, target)
@@ -240,11 +336,13 @@ object RaceCalculator {
         goal: WorkoutGoal,
         currentDistanceMeters: Double?,
         currentCalories: Int?,
+        elapsedSeconds: Long = 0L,
     ): GoalProgressState {
         val target = goal.targetValue?.takeIf { it > 0.0 }
         val userValue = when (goal.type) {
             GoalType.Distance -> currentDistanceMeters ?: 0.0
             GoalType.Calories -> currentCalories?.toDouble() ?: 0.0
+            GoalType.Duration -> elapsedSeconds.toDouble()
             GoalType.None -> currentDistanceMeters ?: 0.0
         }.coerceAtLeast(0.0)
 
@@ -290,6 +388,21 @@ object RaceCalculator {
     private fun durationSeconds(session: WorkoutSessionEntity): Long? {
         val end = session.endTimeMillis ?: return null
         return ((end - session.startTimeMillis) / 1000).coerceAtLeast(0L).takeIf { it > 0L }
+    }
+
+    private fun goalFromSession(session: WorkoutSessionEntity): WorkoutGoal? {
+        return when (GoalType.fromStorage(session.goalType)) {
+            GoalType.Distance -> session.goalTargetDistanceMeters
+                ?.takeIf { it > 0.0 }
+                ?.let { WorkoutGoal.distance(it, GoalSource.Previous) }
+            GoalType.Calories -> session.goalTargetCalories
+                ?.takeIf { it > 0 }
+                ?.let { WorkoutGoal.calories(it, GoalSource.Previous) }
+            GoalType.Duration -> session.goalTargetDurationSeconds
+                ?.takeIf { it > 0L }
+                ?.let { WorkoutGoal.duration(it, GoalSource.Previous) }
+            GoalType.None -> null
+        }
     }
 
     private fun medianDouble(values: List<Double>): Double? {

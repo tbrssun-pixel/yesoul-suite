@@ -8,6 +8,7 @@ import kotlin.math.roundToInt
 internal enum class GoalInputError {
     Distance,
     Calories,
+    Duration,
 }
 
 internal data class GoalInputResult(
@@ -47,6 +48,14 @@ internal object GoalInputParser {
                     GoalInputResult(goal = WorkoutGoal.calories(calories, GoalSource.Manual))
                 }
             }
+            GoalType.Duration -> {
+                val durationSeconds = parseDurationSeconds(normalized)
+                if (durationSeconds == null || durationSeconds <= 0L) {
+                    GoalInputResult(error = GoalInputError.Duration)
+                } else {
+                    GoalInputResult(goal = WorkoutGoal.duration(durationSeconds, GoalSource.Manual))
+                }
+            }
             GoalType.None -> GoalInputResult(error = GoalInputError.Distance)
         }
     }
@@ -61,7 +70,31 @@ internal object GoalInputParser {
                 ?.let { compactDecimal(MeasurementFormatter.distanceValue(it, unitSystem)) }
                 .orEmpty()
             GoalType.Calories -> goal.targetCalories?.toString().orEmpty()
+            GoalType.Duration -> goal.targetDurationSeconds?.let(::durationInputText).orEmpty()
             GoalType.None -> ""
+        }
+    }
+
+    private fun parseDurationSeconds(value: String): Long? {
+        if (value.contains(':')) {
+            val parts = value.split(':')
+            if (parts.size != 2) return null
+            val minutes = parts[0].toLongOrNull() ?: return null
+            val seconds = parts[1].toLongOrNull() ?: return null
+            if (minutes < 0L || seconds !in 0L..59L) return null
+            return minutes * 60L + seconds
+        }
+        val minutes = value.toDoubleOrNull() ?: return null
+        return (minutes * 60.0).roundToInt().toLong()
+    }
+
+    private fun durationInputText(totalSeconds: Long): String {
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return if (seconds == 0L) {
+            minutes.toString()
+        } else {
+            "%d:%02d".format(Locale.US, minutes, seconds)
         }
     }
 

@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DiagnosticSnapshotEntity::class,
         RememberedDeviceEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class WorkoutDatabase : RoomDatabase() {
@@ -30,7 +30,7 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     WorkoutDatabase::class.java,
                     "owl-bike-workouts.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }
@@ -61,6 +61,12 @@ abstract class WorkoutDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_sessions ADD COLUMN goalTargetDurationSeconds INTEGER")
             }
         }
     }
