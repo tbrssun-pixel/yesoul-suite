@@ -69,11 +69,16 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update { it.copy(connection = connection) }
                 if (connection.isConnected) {
                     rememberConnectedDevice(connection)
-                    _uiState.update { state ->
-                        if (state.connectEntry != null) {
-                            state.copy(connectEntry = null, screen = AppScreen.Home)
-                        } else {
-                            state
+                    if (_uiState.value.connectEntry == ConnectEntry.StartRide) {
+                        _uiState.update { it.copy(connectEntry = null) }
+                        startWorkout()
+                    } else {
+                        _uiState.update { state ->
+                            if (state.connectEntry != null) {
+                                state.copy(connectEntry = null, screen = AppScreen.Home)
+                            } else {
+                                state
+                            }
                         }
                     }
                 } else {
@@ -184,6 +189,22 @@ class TrackerViewModel(application: Application) : AndroidViewModel(application)
         }
         openConnect(ConnectEntry.ReconnectLast)
         connectRememberedDevice(device)
+    }
+
+    fun requestHomeStart() {
+        val state = _uiState.value
+        when {
+            state.isWorkoutRunning -> openRidePlanning()
+            state.connection.isConnected -> startPlannedRide()
+            state.connection.isConnecting -> Unit
+            else -> {
+                refreshPermissions()
+                openConnect(ConnectEntry.StartRide)
+                if (_uiState.value.permissionsGranted) {
+                    bleSession.startScan()
+                }
+            }
+        }
     }
 
     fun openRidePlanning() {
@@ -674,6 +695,7 @@ enum class ConnectEntry {
     ReconnectLast,
     ConnectOther,
     FirstSetup,
+    StartRide,
 }
 
 data class TrackerUiState(

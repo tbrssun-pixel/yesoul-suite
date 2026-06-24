@@ -10,8 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -38,7 +41,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -64,7 +66,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -98,6 +99,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -107,6 +109,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -145,8 +148,9 @@ import com.owlbike.v1tracker.settings.LanguageMode
 import com.owlbike.v1tracker.settings.MeasurementFormatter
 import com.owlbike.v1tracker.settings.ThemeMode
 import com.owlbike.v1tracker.settings.UnitSystem
-import com.owlbike.v1tracker.ui.HomePrimaryAction
-import com.owlbike.v1tracker.ui.resolveHomePrimaryAction
+import com.owlbike.v1tracker.ui.HomeWorkoutAction
+import com.owlbike.v1tracker.ui.buildHomeDashboardAggregates
+import com.owlbike.v1tracker.ui.resolveHomeWorkoutAction
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -331,35 +335,60 @@ private val BottomNavItems = listOf(
 )
 
 @Composable
-private fun OwlBottomNavigation(selected: AppScreen, onSelect: (AppScreen) -> Unit) {
+private fun OwlBottomNavigation(selectedScreen: AppScreen, onSelect: (AppScreen) -> Unit) {
     NavigationBar(
         containerColor = AppSurface,
         contentColor = AppInk,
         tonalElevation = 0.dp,
     ) {
         BottomNavItems.forEach { item ->
-            val selectedItem = selected == item.screen
-            NavigationBarItem(
-                selected = selectedItem,
-                onClick = { onSelect(item.screen) },
-                icon = {
+            val selectedItem = selectedScreen == item.screen
+            val label = stringResource(item.labelRes)
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                    .height(58.dp)
+                    .semantics {
+                        contentDescription = label
+                        role = Role.Tab
+                        selected = selectedItem
+                    }
+                    .clickable(role = Role.Tab) { onSelect(item.screen) },
+                shape = RoundedCornerShape(18.dp),
+                color = if (selectedItem) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    Color.Transparent
+                },
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     Icon(
                         painter = painterResource(item.iconRes),
                         contentDescription = null,
+                        tint = if (selectedItem) AppInk else AppMuted,
+                        modifier = Modifier.size(22.dp),
                     )
-                },
-                label = {
+                    Spacer(Modifier.height(3.dp))
                     Text(
-                        stringResource(item.labelRes),
+                        label,
+                        color = if (selectedItem) AppInk else AppMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selectedItem) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                },
-            )
+                }
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OwlBikeApp(
     viewModel: TrackerViewModel,
@@ -383,6 +412,41 @@ private fun OwlBikeApp(
             showSplash = false
         }
     }
+    var showGoalSheet by remember { mutableStateOf(false) }
+    var allowGoalSheetDismiss by remember { mutableStateOf(false) }
+    var showGoalValueSheet by remember { mutableStateOf(false) }
+    var allowGoalValueSheetDismiss by remember { mutableStateOf(false) }
+    val goalSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || allowGoalSheetDismiss
+        },
+    )
+    val goalValueSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            targetValue != SheetValue.Hidden || allowGoalValueSheetDismiss
+        },
+    )
+    val goalSheetScope = rememberCoroutineScope()
+
+    fun dismissGoalSheet() {
+        allowGoalSheetDismiss = true
+        goalSheetScope.launch {
+            goalSheetState.hide()
+            showGoalSheet = false
+            allowGoalSheetDismiss = false
+        }
+    }
+
+    fun dismissGoalValueSheet() {
+        allowGoalValueSheetDismiss = true
+        goalSheetScope.launch {
+            goalValueSheetState.hide()
+            showGoalValueSheet = false
+            allowGoalValueSheetDismiss = false
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -401,7 +465,7 @@ private fun OwlBikeApp(
             containerColor = AppBackground,
             bottomBar = {
                 OwlBottomNavigation(
-                    selected = state.screen,
+                    selectedScreen = state.screen,
                     onSelect = viewModel::selectScreen,
                 )
             },
@@ -427,17 +491,18 @@ private fun OwlBikeApp(
                         onOpenRide = viewModel::openRidePlanning,
                     )
                 } else {
-                    PageTitleBar(stringResource(pageTitleRes(state)))
+                    PageTitleBar(state)
                     when (state.screen) {
                         AppScreen.Home -> HomeScreen(
                             state = state,
                             onOpenRide = viewModel::openRidePlanning,
+                            onStartRide = viewModel::requestHomeStart,
+                            onConnect = viewModel::connect,
+                            onConnectRemembered = viewModel::connectRememberedDevice,
+                            onDisconnect = viewModel::disconnect,
                             onSelectGoalType = viewModel::selectGoalType,
                             onAdjustGoal = viewModel::adjustWorkoutGoal,
-                            onReconnectLast = viewModel::reconnectLastRememberedDevice,
-                            onConnectFirst = { viewModel.openConnect(ConnectEntry.FirstSetup) },
-                            onConnectOther = { viewModel.openConnect(ConnectEntry.ConnectOther) },
-                            onOpenHistory = { viewModel.selectScreen(AppScreen.History) },
+                            onEditGoalValue = { showGoalValueSheet = true },
                         )
                         AppScreen.Ride -> RideScreen(
                         state = state,
@@ -447,7 +512,7 @@ private fun OwlBikeApp(
                         onRequestFinish = viewModel::requestFinishWorkout,
                         onDismissFinish = viewModel::dismissFinishConfirmation,
                         onConfirmFinish = viewModel::finishWorkout,
-                        onConfirmGoalOverride = viewModel::confirmGoalOverride,
+                        onEditGoal = { showGoalSheet = true },
                         onClearFinishedRide = viewModel::clearFinishedRide,
                         onOpenFinishedRide = viewModel::openFinishedRideInHistory,
                     )
@@ -468,6 +533,42 @@ private fun OwlBikeApp(
                     )
                     }
                 }
+            }
+        }
+        if (showGoalSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { dismissGoalSheet() },
+                sheetState = goalSheetState,
+                dragHandle = null,
+                containerColor = AppSurface,
+                contentColor = AppInk,
+            ) {
+                GoalOverrideSheet(
+                    state = state,
+                    onDismiss = { dismissGoalSheet() },
+                    onConfirmGoal = { goal ->
+                        viewModel.confirmGoalOverride(goal)
+                        dismissGoalSheet()
+                    },
+                )
+            }
+        }
+        if (showGoalValueSheet && state.workoutGoal.isActive) {
+            ModalBottomSheet(
+                onDismissRequest = { dismissGoalValueSheet() },
+                sheetState = goalValueSheetState,
+                dragHandle = null,
+                containerColor = AppSurface,
+                contentColor = AppInk,
+            ) {
+                GoalValueEditSheet(
+                    state = state,
+                    onDismiss = { dismissGoalValueSheet() },
+                    onConfirmGoal = { goal ->
+                        viewModel.confirmGoalOverride(goal)
+                        dismissGoalValueSheet()
+                    },
+                )
             }
         }
     }
@@ -543,20 +644,60 @@ private fun SplashScreen(versionName: String, onContinue: () -> Unit) {
 }
 
 @Composable
-private fun PageTitleBar(title: String) {
-    Text(
-        text = title,
+private fun PageTitleBar(state: TrackerUiState) {
+    val title = stringResource(pageTitleRes(state))
+    val pageHelpLabel = stringResource(R.string.page_help_button)
+    var showPageHelp by rememberSaveable { mutableStateOf(false) }
+
+    if (showPageHelp) {
+        AlertDialog(
+            onDismissRequest = { showPageHelp = false },
+            confirmButton = {
+                TextButton(onClick = { showPageHelp = false }) {
+                    Text(stringResource(R.string.dialog_ok))
+                }
+            },
+            title = {
+                Text(
+                    title,
+                    color = AppInk,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            },
+            text = {
+                Text(
+                    stringResource(pageHelpBodyRes(state)),
+                    color = AppMuted,
+                )
+            },
+            containerColor = AppSurface,
+            titleContentColor = AppInk,
+            textContentColor = AppMuted,
+        )
+    }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(AppBackground)
-            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 6.dp)
-            .semantics { heading() },
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = AppInk,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+            .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f).semantics { heading() },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = AppInk,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        HelpIconButton(
+            label = pageHelpLabel,
+            onClick = { showPageHelp = true },
+        )
+    }
 }
 
 private fun pageTitleRes(state: TrackerUiState): Int {
@@ -569,6 +710,49 @@ private fun pageTitleRes(state: TrackerUiState): Int {
         }
         AppScreen.History -> R.string.tab_history
         AppScreen.Profile -> R.string.profile_settings
+    }
+}
+
+private fun pageHelpBodyRes(state: TrackerUiState): Int {
+    return when (state.screen) {
+        AppScreen.Home -> R.string.page_help_home
+        AppScreen.Ride -> when {
+            state.rideStage == RideStage.Results && state.lastFinishedSession != null && !state.isWorkoutRunning -> R.string.page_help_ride_results
+            state.isWorkoutRunning -> R.string.page_help_ride_live
+            else -> R.string.page_help_ride_plan
+        }
+        AppScreen.History -> R.string.page_help_history
+        AppScreen.Profile -> R.string.page_help_profile
+    }
+}
+
+@Composable
+private fun HelpIconButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.size(32.dp).semantics {
+            contentDescription = label
+        },
+    ) {
+        Surface(
+            modifier = Modifier.size(24.dp),
+            shape = CircleShape,
+            color = AppSurfaceMuted,
+            border = BorderStroke(1.dp, AppBorder),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    "?",
+                    color = AppMuted,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 
@@ -634,58 +818,94 @@ private fun StatusPill(state: TrackerUiState) {
 private fun HomeScreen(
     state: TrackerUiState,
     onOpenRide: () -> Unit,
+    onStartRide: () -> Unit,
+    onConnect: (BleDeviceItem) -> Unit,
+    onConnectRemembered: (RememberedDeviceEntity) -> Unit,
+    onDisconnect: () -> Unit,
     onSelectGoalType: (GoalType) -> Unit,
     onAdjustGoal: (Int) -> Unit,
-    onReconnectLast: () -> Unit,
-    onConnectFirst: () -> Unit,
-    onConnectOther: () -> Unit,
-    onOpenHistory: () -> Unit,
+    onEditGoalValue: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { HomeAchievementBand(state, onOpenHistory) }
+        item { HomeAchievementBand(state) }
         item {
             HomeTrainerRow(
                 state = state,
-                onOpenRide = onOpenRide,
-                onReconnectLast = onReconnectLast,
-                onConnectFirst = onConnectFirst,
-                onConnectOther = onConnectOther,
+                onConnect = onConnect,
+                onConnectRemembered = onConnectRemembered,
+                onDisconnect = onDisconnect,
             )
         }
         item {
-            HomeMedianDashboardRow(
+            HomeWorkoutPlanPanel(
                 state = state,
+                onOpenRide = onOpenRide,
+                onStartRide = onStartRide,
                 onSelectGoalType = onSelectGoalType,
-            )
-        }
-        item {
-            HomeNextWorkoutPlanner(
-                state = state,
-                onOpenRide = onOpenRide,
                 onAdjustGoal = onAdjustGoal,
+                onEditGoalValue = onEditGoalValue,
             )
         }
     }
 }
 
 @Composable
-private fun HomeAchievementBand(state: TrackerUiState, onOpenHistory: () -> Unit) {
+private fun HomeAchievementBand(state: TrackerUiState) {
     val unitSystem = state.settings.unitSystem
-    val finishedSessions = state.sessions.filter { it.state == "finished" }
-    val totalDistanceMeters = finishedSessions.mapNotNull { it.totalDistanceMeters }.sum()
-    val totalDistanceText = MeasurementFormatter.distance(totalDistanceMeters, unitSystem)
+    val aggregates = remember(state.sessions) { buildHomeDashboardAggregates(state.sessions) }
+    val totalDistanceUnit = MeasurementFormatter.distanceUnit(unitSystem)
+    val totalDistanceValue = MeasurementFormatter.distanceValue(aggregates.totalDistanceMeters, unitSystem).format(2)
+    val totalDistanceText = "$totalDistanceValue $totalDistanceUnit"
+    val totalDurationText = formatDurationSeconds(aggregates.totalDurationSeconds)
+    val totalCaloriesValue = aggregates.totalCalories.toString()
     val streakDays = state.personalBaseline.currentStreakDays
-    val description = stringResource(R.string.home_dashboard_achievement_description, streakDays, totalDistanceText)
+    val achievementIconSize = with(LocalDensity.current) {
+        MaterialTheme.typography.headlineMedium.fontSize.toPx().toDp()
+    }
+    var isCarouselPaused by rememberSaveable { mutableStateOf(false) }
+    val carouselActionDescription = stringResource(
+        if (isCarouselPaused) R.string.home_aggregate_play else R.string.home_aggregate_pause,
+    )
+    val description = stringResource(
+        R.string.home_dashboard_achievement_description,
+        streakDays,
+        totalDistanceText,
+        totalDurationText,
+        aggregates.workoutDays,
+        aggregates.totalCalories,
+    )
+    val carouselMetrics = listOf(
+        DashboardAggregateMetric(
+            label = stringResource(R.string.home_aggregate_distance),
+            value = totalDistanceValue,
+            unit = totalDistanceUnit,
+        ),
+        DashboardAggregateMetric(
+            label = stringResource(R.string.home_aggregate_duration),
+            value = totalDurationText,
+        ),
+        DashboardAggregateMetric(
+            label = stringResource(R.string.home_aggregate_workout_days),
+            value = aggregates.workoutDays.toString(),
+        ),
+        DashboardAggregateMetric(
+            label = stringResource(R.string.home_aggregate_calories),
+            value = totalCaloriesValue,
+            unit = "kcal",
+        ),
+    )
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onOpenHistory)
-            .semantics { contentDescription = description },
+            .semantics {
+                contentDescription = "$description. $carouselActionDescription"
+            }
+            .clickable(role = Role.Button) { isCarouselPaused = !isCarouselPaused },
         shape = RoundedCornerShape(8.dp),
         color = AppSurface,
         border = BorderStroke(1.dp, AppGold.copy(alpha = 0.38f)),
@@ -694,8 +914,8 @@ private fun HomeAchievementBand(state: TrackerUiState, onOpenHistory: () -> Unit
             modifier = Modifier
                 .fillMaxWidth()
                 .background(AppGold.copy(alpha = 0.05f))
-                .padding(horizontal = 14.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 14.dp, vertical = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             DashboardAchievementMetric(
@@ -708,7 +928,7 @@ private fun HomeAchievementBand(state: TrackerUiState, onOpenHistory: () -> Unit
                         painter = painterResource(R.drawable.ic_flame),
                         contentDescription = null,
                         tint = AppGold,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(achievementIconSize),
                     )
                 },
             )
@@ -718,17 +938,72 @@ private fun HomeAchievementBand(state: TrackerUiState, onOpenHistory: () -> Unit
                     .height(58.dp)
                     .background(AppBorder.copy(alpha = 0.74f)),
             )
-            DashboardAchievementMetric(
-                label = stringResource(
-                    R.string.total_distance_short_unit,
-                    MeasurementFormatter.distanceUnit(unitSystem),
-                ),
-                value = totalDistanceText,
-                accent = AppAccent,
-                modifier = Modifier.weight(1f),
+            DashboardAggregateCarousel(
+                metrics = carouselMetrics,
+                isPaused = isCarouselPaused,
+                modifier = Modifier.weight(2f),
             )
         }
     }
+}
+
+private data class DashboardAggregateMetric(
+    val label: String,
+    val value: String,
+    val unit: String? = null,
+)
+
+@Composable
+private fun DashboardAggregateCarousel(
+    metrics: List<DashboardAggregateMetric>,
+    isPaused: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (metrics.isEmpty()) return
+
+    var selectedIndex by rememberSaveable { mutableStateOf(0) }
+    val activeIndex = selectedIndex.floorMod(metrics.size)
+
+    LaunchedEffect(activeIndex, isPaused, metrics.size) {
+        if (!isPaused && metrics.size > 1) {
+            delay(4_000)
+            selectedIndex = (activeIndex + 1).floorMod(metrics.size)
+        }
+    }
+
+    Row(
+        modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Crossfade(
+            targetState = activeIndex,
+            animationSpec = tween(durationMillis = 450),
+            label = "dashboardAggregateCrossfade",
+            modifier = Modifier.weight(1f),
+        ) {
+            val metric = metrics[it]
+            DashboardAchievementMetric(
+                label = metric.label,
+                value = metric.value,
+                accent = AppGold,
+                modifier = Modifier.fillMaxWidth(),
+                unit = metric.unit,
+            )
+        }
+        Icon(
+            painter = painterResource(
+                if (isPaused) R.drawable.ic_play_circle else R.drawable.ic_pause_circle,
+            ),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = AppGold,
+        )
+    }
+}
+
+private fun Int.floorMod(other: Int): Int {
+    return ((this % other) + other) % other
 }
 
 @Composable
@@ -737,18 +1012,31 @@ private fun DashboardAchievementMetric(
     value: String,
     accent: Color,
     modifier: Modifier = Modifier,
+    unit: String? = null,
     icon: (@Composable () -> Unit)? = null,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 value,
                 style = MaterialTheme.typography.headlineMedium,
                 color = AppInk,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            unit?.let {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    it,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 3.dp),
+                )
+            }
             if (icon != null) {
                 Spacer(Modifier.width(6.dp))
                 icon()
@@ -759,8 +1047,7 @@ private fun DashboardAchievementMetric(
             style = MaterialTheme.typography.labelSmall,
             color = accent,
             fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            maxLines = 3,
         )
     }
 }
@@ -768,50 +1055,46 @@ private fun DashboardAchievementMetric(
 @Composable
 private fun HomeTrainerRow(
     state: TrackerUiState,
-    onOpenRide: () -> Unit,
-    onReconnectLast: () -> Unit,
-    onConnectFirst: () -> Unit,
-    onConnectOther: () -> Unit,
+    onConnect: (BleDeviceItem) -> Unit,
+    onConnectRemembered: (RememberedDeviceEntity) -> Unit,
+    onDisconnect: () -> Unit,
 ) {
     val nearbyByAddress = state.devices.associateBy { it.address }
     val lastDevice = state.rememberedDevices.firstOrNull { device ->
         isLikelyTrainerEquipment(device, nearbyByAddress[device.address])
     }
-    val action = resolveHomePrimaryAction(
-        isConnected = state.connection.isConnected,
-        isConnecting = state.connection.isConnecting,
-        hasRememberedDevice = lastDevice != null,
-    )
-    val displayName = when {
-        state.connection.isConnected -> state.connection.deviceName
-            ?: EQUIPMENT_MODEL_NAME
-        lastDevice != null -> lastDevice.name ?: EQUIPMENT_MODEL_NAME
+    val activeRememberedDevice = state.rememberedDevices.firstOrNull { device ->
+        device.address == state.connection.deviceAddress &&
+            isLikelyTrainerEquipment(device, nearbyByAddress[device.address])
+    }
+    val trainerDevice = activeRememberedDevice ?: lastDevice
+    val activeTrainerAddress = state.connection.deviceAddress?.takeIf {
+        state.connection.isConnected && state.connection.capabilities.hasIndoorBikeData
+    }
+    val displayAddress = trainerDevice?.address ?: activeTrainerAddress
+    val toggleAddress = trainerDevice?.address
+    val nearbyDevice = displayAddress?.let { nearbyByAddress[it] }
+    val isTrainer = trainerDevice?.let { isLikelyTrainerEquipment(it, nearbyDevice) }
+        ?: (activeTrainerAddress != null)
+    val activeConnectionLabel = state.connection.deviceName ?: state.connection.deviceAddress
+    val bluetoothName = when {
+        displayAddress != null &&
+            state.connection.deviceAddress == displayAddress &&
+            activeConnectionLabel != null -> activeConnectionLabel
+        trainerDevice != null -> equipmentDisplayName(trainerDevice, nearbyDevice)
         else -> stringResource(R.string.home_no_trainer)
     }
-    val statusText = when {
-        state.connection.isConnected -> stringResource(R.string.connected)
-        state.connection.isConnecting -> stringResource(R.string.connect_title_connecting)
-        state.connection.isScanning -> stringResource(R.string.connect_title_scanning)
-        else -> stringResource(R.string.not_connected)
+    val title = if (displayAddress != null && isTrainer) {
+        EQUIPMENT_MODEL_NAME
+    } else {
+        bluetoothName
     }
-    val statusColor = when {
-        state.connection.isConnected -> AppSuccess
-        state.connection.isConnecting || state.connection.isScanning -> AppWarning
-        else -> AppMuted
-    }
-    val primaryLabel = when {
-        state.isWorkoutRunning -> stringResource(R.string.continue_ride)
-        action == HomePrimaryAction.OpenRide -> stringResource(R.string.open_ride)
-        action == HomePrimaryAction.ReconnectLast -> stringResource(R.string.reconnect_last_trainer)
-        action == HomePrimaryAction.WaitForConnection -> stringResource(R.string.connect_title_connecting)
-        else -> stringResource(R.string.connect_trainer)
-    }
-    val primaryAction: () -> Unit = when {
-        state.isWorkoutRunning -> onOpenRide
-        action == HomePrimaryAction.OpenRide -> onOpenRide
-        action == HomePrimaryAction.ReconnectLast -> onReconnectLast
-        action == HomePrimaryAction.OpenFirstSetupConnect -> onConnectFirst
-        else -> ({})
+    val subtitle = bluetoothName.takeIf { displayAddress != null }
+    val connectEquipment = {
+        when {
+            nearbyDevice != null -> onConnect(nearbyDevice)
+            trainerDevice != null -> onConnectRemembered(trainerDevice)
+        }
     }
 
     Surface(
@@ -820,74 +1103,55 @@ private fun HomeTrainerRow(
         color = AppSurface,
         border = BorderStroke(1.dp, AppBorder),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            EquipmentThumbnail(Modifier.size(48.dp), framed = false)
-            Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+            Text(
+                stringResource(R.string.home_last_trainer),
+                style = MaterialTheme.typography.titleSmall,
+                color = AppInk,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    stringResource(R.string.home_last_trainer),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AppInk,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                MiniChip(statusText, statusColor)
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Button(
-                    onClick = primaryAction,
-                    enabled = action != HomePrimaryAction.WaitForConnection || state.isWorkoutRunning,
-                    modifier = Modifier.widthIn(min = 112.dp, max = 154.dp).heightIn(min = 42.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppAccent,
-                        disabledContainerColor = AppSurfaceMuted,
-                        disabledContentColor = AppMuted,
-                    ),
+                EquipmentThumbnail(Modifier.size(64.dp), framed = false)
+                Column(
+                    Modifier.weight(1f),
                 ) {
-                    if (action == HomePrimaryAction.WaitForConnection && !state.isWorkoutRunning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = AppMuted,
-                        )
-                    } else {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AppInk,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    subtitle?.let {
+                        Spacer(Modifier.height(4.dp))
                         Text(
-                            primaryLabel,
-                            color = AppLightCardText,
-                            fontWeight = FontWeight.SemiBold,
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
-                TextButton(
-                    onClick = onConnectOther,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.connect_other_trainer),
-                        color = AppAccent,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                if (toggleAddress != null) {
+                    HomeTrainerPowerSwitch(
+                        address = toggleAddress,
+                        connection = state.connection,
+                        isTrainer = isTrainer,
+                        isAvailable = isTrainer || state.connection.deviceAddress == toggleAddress,
+                        onConnect = connectEquipment,
+                        onDisconnect = onDisconnect,
                     )
                 }
             }
@@ -896,108 +1160,407 @@ private fun HomeTrainerRow(
 }
 
 @Composable
-private fun HomeMedianDashboardRow(
+private fun HomeTrainerPowerSwitch(
+    address: String,
+    connection: BleConnectionState,
+    isTrainer: Boolean,
+    isAvailable: Boolean,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    val isActiveDevice = connection.deviceAddress == address
+    val isConnectingDevice = connection.isConnecting && isActiveDevice
+    val isConnectedDevice = connection.isConnected && isActiveDevice
+    val anotherDeviceActive = !isActiveDevice && (connection.isConnecting || connection.isConnected)
+    val label = stringResource(
+        when {
+            isConnectingDevice -> R.string.connect_title_connecting
+            isConnectedDevice -> R.string.equipment_toggle_on
+            else -> R.string.equipment_toggle_off
+        },
+    )
+    val actionsLabel = stringResource(R.string.equipment_actions)
+    val canTurnOn = isTrainer && isAvailable && !isConnectedDevice && !isConnectingDevice && !anotherDeviceActive
+    val canTurnOff = isConnectedDevice
+
+    if (isConnectingDevice) {
+        Surface(
+            modifier = Modifier
+                .width(56.dp)
+                .height(44.dp)
+                .semantics {
+                    contentDescription = label
+                    role = Role.Button
+                }
+                .clickable(role = Role.Button, onClick = onDisconnect),
+            shape = RoundedCornerShape(50),
+            color = AppSurfaceMuted,
+            border = BorderStroke(1.dp, AppBorder),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = AppAccent,
+                )
+            }
+        }
+        return
+    }
+
+    Switch(
+        modifier = Modifier.semantics {
+            contentDescription = actionsLabel
+            stateDescription = label
+        },
+        checked = isConnectedDevice,
+        enabled = canTurnOn || canTurnOff,
+        onCheckedChange = { checked ->
+            if (checked && canTurnOn) {
+                onConnect()
+            } else if (!checked && canTurnOff) {
+                onDisconnect()
+            }
+        },
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = AppBackground,
+            checkedTrackColor = AppAccent,
+            checkedBorderColor = AppAccent,
+            uncheckedThumbColor = AppBackground,
+            uncheckedTrackColor = AppSurfaceMuted,
+            uncheckedBorderColor = AppBorder,
+            disabledCheckedThumbColor = AppBackground.copy(alpha = 0.72f),
+            disabledCheckedTrackColor = AppAccent.copy(alpha = 0.46f),
+            disabledUncheckedThumbColor = AppMuted.copy(alpha = 0.62f),
+            disabledUncheckedTrackColor = AppSurfaceMuted.copy(alpha = 0.54f),
+        ),
+    )
+}
+
+private data class MetricDisplay(
+    val value: String,
+    val unit: String? = null,
+)
+
+@Composable
+private fun HomeWorkoutPlanPanel(
     state: TrackerUiState,
+    onOpenRide: () -> Unit,
+    onStartRide: () -> Unit,
     onSelectGoalType: (GoalType) -> Unit,
+    onAdjustGoal: (Int) -> Unit,
+    onEditGoalValue: () -> Unit,
 ) {
     val unitSystem = state.settings.unitSystem
     val baseline = state.personalBaseline
     val medianDuration = baseline.medianDistanceDurationSeconds ?: baseline.medianCaloriesDurationSeconds
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            stringResource(R.string.median_dashboard_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = AppInk,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 2.dp),
+    val unavailable = stringResource(R.string.need_more_rides)
+    val distanceDisplay = baseline.medianDistanceMeters
+        ?.let { MetricDisplay(MeasurementFormatter.distanceValue(it, unitSystem).format(2), MeasurementFormatter.distanceUnit(unitSystem)) }
+        ?: MetricDisplay(unavailable)
+    val caloriesDisplay = baseline.medianCalories
+        ?.let { MetricDisplay(it.toString(), "kcal") }
+        ?: MetricDisplay(unavailable)
+    val durationDisplay = medianDuration
+        ?.let { MetricDisplay(formatDurationSeconds(it)) }
+        ?: MetricDisplay(unavailable)
+    val goal = state.workoutGoal
+    val selectedType = goal.type
+    val accent = goalAccent(selectedType)
+    val targetDisplay = goalMetricDisplay(goal, unitSystem, stringResource(R.string.goal_free_ride))
+    val action = resolveHomeWorkoutAction(
+        isWorkoutRunning = state.isWorkoutRunning,
+        isConnected = state.connection.isConnected,
+        isConnecting = state.connection.isConnecting,
+    )
+    var showStartRequiresTrainerWarning by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(action) {
+        if (action != HomeWorkoutAction.StartNeedsConnection) {
+            showStartRequiresTrainerWarning = false
+        }
+    }
+    val ctaLabel = when (action) {
+        HomeWorkoutAction.ContinueRide -> stringResource(R.string.continue_ride)
+        HomeWorkoutAction.StartRide,
+        HomeWorkoutAction.StartNeedsConnection,
+        HomeWorkoutAction.WaitForConnection -> stringResource(R.string.home_start_workout)
+    }
+    val ctaAction = when (action) {
+        HomeWorkoutAction.ContinueRide -> onOpenRide
+        HomeWorkoutAction.StartRide -> onStartRide
+        HomeWorkoutAction.StartNeedsConnection -> ({ showStartRequiresTrainerWarning = true })
+        HomeWorkoutAction.WaitForConnection -> ({})
+    }
+    val ctaEnabled = action != HomeWorkoutAction.WaitForConnection
+    val ctaLooksActive = action == HomeWorkoutAction.ContinueRide || action == HomeWorkoutAction.StartRide
+    val benchmarkHelpLabel = stringResource(R.string.home_benchmark_help)
+    val distanceWeight by animateFloatAsState(
+        targetValue = if (selectedType == GoalType.Distance && baseline.hasDistanceBaseline) 1.42f else 1f,
+        animationSpec = tween(durationMillis = 180),
+        label = "distanceWeight",
+    )
+    val caloriesWeight by animateFloatAsState(
+        targetValue = if (selectedType == GoalType.Calories && baseline.hasCaloriesBaseline) 1.42f else 1f,
+        animationSpec = tween(durationMillis = 180),
+        label = "caloriesWeight",
+    )
+    val durationWeight by animateFloatAsState(
+        targetValue = if (selectedType == GoalType.Duration && medianDuration != null) 1.42f else 1f,
+        animationSpec = tween(durationMillis = 180),
+        label = "durationWeight",
+    )
+    var showBenchmarkHelp by remember { mutableStateOf(false) }
+
+    if (showBenchmarkHelp) {
+        AlertDialog(
+            onDismissRequest = { showBenchmarkHelp = false },
+            confirmButton = {
+                TextButton(onClick = { showBenchmarkHelp = false }) {
+                    Text(stringResource(R.string.dialog_ok))
+                }
+            },
+            title = {
+                Text(
+                    benchmarkHelpLabel,
+                    color = AppInk,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.home_benchmark_hint),
+                    color = AppMuted,
+                )
+            },
+            containerColor = AppSurface,
+            titleContentColor = AppInk,
+            textContentColor = AppMuted,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = AppSurface,
+        border = BorderStroke(1.dp, accent.copy(alpha = if (goal.isActive) 0.30f else 0.18f)),
+    ) {
+        Column(
+            Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            DashboardMetric(
-                label = stringResource(R.string.median_distance_short),
-                value = baseline.medianDistanceMeters?.let { MeasurementFormatter.distance(it, unitSystem) } ?: "--",
-                accent = AppCyan,
-                selected = state.workoutGoal.type == GoalType.Distance,
-                enabled = baseline.hasDistanceBaseline,
-                onClick = { onSelectGoalType(GoalType.Distance) },
-                modifier = Modifier.weight(1f),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.home_planner_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AppInk,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                HelpIconButton(
+                    label = benchmarkHelpLabel,
+                    onClick = { showBenchmarkHelp = true },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HomeGoalMetricCard(
+                    title = stringResource(R.string.median_distance_short),
+                    display = distanceDisplay,
+                    accent = AppCyan,
+                    selected = selectedType == GoalType.Distance && baseline.hasDistanceBaseline,
+                    enabled = baseline.hasDistanceBaseline,
+                    onClick = { onSelectGoalType(GoalType.Distance) },
+                    modifier = Modifier.weight(distanceWeight),
+                )
+                HomeGoalMetricCard(
+                    title = stringResource(R.string.median_calories_short),
+                    display = caloriesDisplay,
+                    accent = AppGold,
+                    selected = selectedType == GoalType.Calories && baseline.hasCaloriesBaseline,
+                    enabled = baseline.hasCaloriesBaseline,
+                    onClick = { onSelectGoalType(GoalType.Calories) },
+                    modifier = Modifier.weight(caloriesWeight),
+                )
+                HomeGoalMetricCard(
+                    title = stringResource(R.string.median_duration_short),
+                    display = durationDisplay,
+                    accent = AppAccent,
+                    selected = selectedType == GoalType.Duration && medianDuration != null,
+                    enabled = medianDuration != null,
+                    onClick = { onSelectGoalType(GoalType.Duration) },
+                    modifier = Modifier.weight(durationWeight),
+                )
+            }
+            HomeGoalStepper(
+                target = targetDisplay,
+                accent = accent,
+                adjustable = goal.isActive,
+                onAdjustGoal = onAdjustGoal,
+                onEditGoalValue = onEditGoalValue,
             )
-            DashboardMetric(
-                label = stringResource(R.string.median_calories_short),
-                value = baseline.medianCalories?.toString() ?: "--",
-                accent = AppGold,
-                selected = state.workoutGoal.type == GoalType.Calories,
-                enabled = baseline.hasCaloriesBaseline,
-                onClick = { onSelectGoalType(GoalType.Calories) },
-                modifier = Modifier.weight(1f),
-            )
-            DashboardMetric(
-                label = stringResource(R.string.median_duration_short),
-                value = medianDuration?.let(::formatDurationSeconds) ?: "--",
-                accent = AppAccent,
-                selected = state.workoutGoal.type == GoalType.Duration,
-                enabled = medianDuration != null,
-                onClick = { onSelectGoalType(GoalType.Duration) },
-                modifier = Modifier.weight(1f),
-            )
+            Button(
+                onClick = ctaAction,
+                enabled = ctaEnabled,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (ctaLooksActive) AppAccent else AppSurfaceMuted,
+                    disabledContainerColor = AppSurfaceMuted,
+                    disabledContentColor = AppMuted,
+                ),
+            ) {
+                Text(
+                    ctaLabel,
+                    color = if (ctaLooksActive) AppLightCardText else AppMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            if (showStartRequiresTrainerWarning) {
+                Text(
+                    stringResource(R.string.home_start_requires_trainer_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppWarning,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun DashboardMetric(
-    label: String,
-    value: String,
+private fun HomeGoalMetricCard(
+    title: String,
+    display: MetricDisplay,
     accent: Color,
     selected: Boolean,
-    enabled: Boolean = true,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectedStateText = stringResource(
         if (selected) R.string.goal_type_selected else R.string.goal_type_not_selected,
     )
+    val valueSize by animateFloatAsState(
+        targetValue = if (selected) 26f else 19f,
+        animationSpec = tween(durationMillis = 180),
+        label = "goalMetricValueSize",
+    )
+    val unitSize by animateFloatAsState(
+        targetValue = if (selected) 12f else 10f,
+        animationSpec = tween(durationMillis = 180),
+        label = "goalMetricUnitSize",
+    )
+    val alpha = if (enabled) 1f else 0.54f
+    val inactiveMetricColor = AppInk.copy(alpha = 0.78f)
+    val metricColor = if (selected) accent else inactiveMetricColor
+
     Surface(
         modifier = modifier
-            .heightIn(min = 92.dp)
-            .alpha(if (enabled) 1f else 0.56f)
+            .heightIn(min = 106.dp)
+            .alpha(alpha)
+            .animateContentSize()
             .semantics {
-                contentDescription = "$label: $value"
+                contentDescription = "$title: ${display.value}${display.unit?.let { " $it" } ?: ""}"
                 role = Role.Button
                 stateDescription = selectedStateText
             }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         color = if (selected) accent.copy(alpha = 0.10f) else AppSurfaceMuted,
-        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.72f else 0.18f)),
+        border = BorderStroke(1.dp, if (selected) accent.copy(alpha = 0.50f) else AppBorder),
     ) {
-        Column(
-            Modifier.padding(horizontal = 9.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 11.dp)) {
+            Column(
+                Modifier.fillMaxWidth().padding(end = if (selected) 22.dp else 0.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Spacer(Modifier.height(17.dp))
+                HomeMetricValue(
+                    display = display,
+                    valueColor = metricColor,
+                    valueSize = valueSize,
+                    unitSize = unitSize,
+                    maxLines = if (display.unit == null && !enabled) 2 else 1,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(if (selected) 32.dp else 22.dp)
+                        .height(2.dp)
+                        .background(metricColor.copy(alpha = if (selected) 0.72f else 0.68f)),
+                )
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = metricColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(18.dp)
+                        .background(accent, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_success_check),
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = AppLightCardText,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeMetricValue(
+    display: MetricDisplay,
+    valueColor: Color,
+    valueSize: Float,
+    unitSize: Float,
+    maxLines: Int = 1,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            display.value,
+            style = MaterialTheme.typography.titleMedium,
+            color = valueColor,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = valueSize.sp,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+        )
+        display.unit?.let { unit ->
             Text(
-                value,
-                style = MaterialTheme.typography.titleLarge,
-                color = AppInk,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(2.dp)
-                    .background(accent.copy(alpha = 0.72f)),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                label,
+                unit,
                 style = MaterialTheme.typography.labelSmall,
-                color = AppMuted,
-                maxLines = 2,
+                color = valueColor,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = unitSize.sp,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -1015,16 +1578,6 @@ private fun goalTypeLabel(type: GoalType): String {
 }
 
 @Composable
-private fun goalTypeChipLabel(type: GoalType): String {
-    return when (type) {
-        GoalType.Distance -> stringResource(R.string.distance)
-        GoalType.Calories -> stringResource(R.string.calories)
-        GoalType.Duration -> stringResource(R.string.elapsed)
-        GoalType.None -> stringResource(R.string.no_goal)
-    }
-}
-
-@Composable
 private fun goalSourceLabel(goal: WorkoutGoal): String {
     return when {
         !goal.isActive -> stringResource(R.string.goal_not_set)
@@ -1035,149 +1588,95 @@ private fun goalSourceLabel(goal: WorkoutGoal): String {
 }
 
 @Composable
-private fun HomeNextWorkoutPlanner(
-    state: TrackerUiState,
-    onOpenRide: () -> Unit,
-    onAdjustGoal: (Int) -> Unit,
-) {
-    val unitSystem = state.settings.unitSystem
-    val goal = state.workoutGoal
-    val target = goal.targetValue?.let { formatRaceMetric(goal.type, it, unitSystem) }
-        ?: stringResource(R.string.goal_free_ride)
-    val chipText = goalTypeChipLabel(goal.type)
-    val sourceText = if (goal.isActive) goalSourceLabel(goal) else stringResource(R.string.goal_free_ride)
-    val accent = when (goal.type) {
+private fun goalAccent(type: GoalType): Color {
+    return when (type) {
         GoalType.Distance -> AppCyan
         GoalType.Calories -> AppGold
         GoalType.Duration -> AppAccent
-        GoalType.None -> AppMuted
+        GoalType.None -> AppAccent
     }
-    val lastFinishedSession = remember(state.sessions) { latestFinishedSession(state.sessions) }
-    val lastActualText = if (goal.isActive) {
-        lastFinishedSession
-            ?.let { sessionActualValue(it, goal.type) }
-            ?.let { formatRaceMetric(goal.type, it, unitSystem) }
-    } else {
-        null
-    }
+}
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = AppSurface,
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
-    ) {
-        Column(
-            Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        stringResource(R.string.home_planner_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = AppInk,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    MiniChip(chipText, accent)
-                }
-            }
-            if (goal.isActive) {
-                HomeGoalStepper(
-                    target = target,
-                    accent = accent,
-                    onAdjustGoal = onAdjustGoal,
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PlannerReferenceRow(
-                        label = sourceText,
-                        value = target,
-                        accent = accent,
-                    )
-                    PlannerReferenceRow(
-                        label = stringResource(R.string.goal_previous_short),
-                        value = lastActualText ?: "--",
-                        accent = AppMuted,
-                    )
-                }
-            } else {
-                Text(
-                    target,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = accent,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Button(
-                onClick = onOpenRide,
-                enabled = state.connection.isConnected,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppAccent,
-                    disabledContainerColor = AppSurfaceMuted,
-                    disabledContentColor = AppMuted,
-                ),
-            ) {
-                Text(
-                    stringResource(
-                        if (state.connection.isConnected) R.string.go_to_workout else R.string.connect_trainer_to_workout,
-                    ),
-                    color = if (state.connection.isConnected) AppLightCardText else AppMuted,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+private fun goalMetricDisplay(goal: WorkoutGoal, unitSystem: UnitSystem, fallback: String): MetricDisplay {
+    val value = goal.targetValue ?: return MetricDisplay(fallback)
+    return when (goal.type) {
+        GoalType.Distance -> MetricDisplay(
+            MeasurementFormatter.distanceValue(value, unitSystem).format(2),
+            MeasurementFormatter.distanceUnit(unitSystem),
+        )
+        GoalType.Calories -> MetricDisplay(value.format(0), "kcal")
+        GoalType.Duration -> MetricDisplay(formatDurationSeconds(value.toLong()))
+        GoalType.None -> MetricDisplay(fallback)
     }
 }
 
 @Composable
 private fun HomeGoalStepper(
-    target: String,
+    target: MetricDisplay,
     accent: Color,
+    adjustable: Boolean,
     onAdjustGoal: (Int) -> Unit,
+    onEditGoalValue: () -> Unit,
 ) {
     val view = LocalView.current
-    Row(
+    val editGoalText = stringResource(R.string.edit_goal)
+    val editDescription = "$editGoalText: ${target.value}${target.unit?.let { " $it" } ?: ""}"
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        shape = RoundedCornerShape(8.dp),
+        color = AppSurfaceMuted.copy(alpha = 0.76f),
     ) {
-        GoalStepperButton(
-            text = "-",
-            contentDescription = stringResource(R.string.decrease_goal),
-            accent = accent,
-            onClick = {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                onAdjustGoal(-1)
-            },
-        )
-        Text(
-            target,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.headlineMedium,
-            color = accent,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        GoalStepperButton(
-            text = "+",
-            contentDescription = stringResource(R.string.increase_goal),
-            accent = accent,
-            onClick = {
-                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                onAdjustGoal(1)
-            },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (adjustable) {
+                GoalStepperButton(
+                    text = "-",
+                    contentDescription = stringResource(R.string.decrease_goal),
+                    accent = accent,
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        onAdjustGoal(-1)
+                    },
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp)
+                    .semantics {
+                        contentDescription = editDescription
+                        if (adjustable) {
+                            role = Role.Button
+                        }
+                    }
+                    .clickable(enabled = adjustable, role = Role.Button) {
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        onEditGoalValue()
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                HomeMetricValue(
+                    display = target,
+                    valueColor = accent,
+                    valueSize = if (adjustable) 30f else 21f,
+                    unitSize = 14f,
+                )
+            }
+            if (adjustable) {
+                GoalStepperButton(
+                    text = "+",
+                    contentDescription = stringResource(R.string.increase_goal),
+                    accent = accent,
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        onAdjustGoal(1)
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -1210,49 +1709,6 @@ private fun GoalStepperButton(
             )
         }
     }
-}
-
-@Composable
-private fun PlannerReferenceRow(
-    label: String,
-    value: String,
-    accent: Color,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                color = AppMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                value,
-                style = MaterialTheme.typography.labelLarge,
-                color = AppInk,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(accent.copy(alpha = 0.28f)),
-        )
-    }
-}
-
-private fun latestFinishedSession(sessions: List<WorkoutSessionEntity>): WorkoutSessionEntity? {
-    return sessions
-        .filter { it.state == "finished" && it.endTimeMillis != null }
-        .maxByOrNull { it.endTimeMillis ?: Long.MIN_VALUE }
 }
 
 @Composable
@@ -1559,20 +2015,39 @@ private fun HiddenDevicesHint(hiddenCount: Int) {
 
 @Composable
 private fun ConnectHero(state: TrackerUiState) {
+    val isStartRideFlow = state.connectEntry == ConnectEntry.StartRide
     val deviceLabel = state.connection.deviceName
         ?: EQUIPMENT_MODEL_NAME
     val title = when {
         !state.permissionsGranted -> stringResource(R.string.connect_title_permission)
         state.connection.isConnected -> stringResource(R.string.connect_title_connected, deviceLabel)
-        state.connection.isConnecting -> stringResource(R.string.connect_title_connecting)
-        state.connection.isScanning -> stringResource(R.string.connect_title_scanning)
+        state.connection.isConnecting -> if (isStartRideFlow) {
+            stringResource(R.string.connect_start_title_connecting)
+        } else {
+            stringResource(R.string.connect_title_connecting)
+        }
+        state.connection.isScanning -> if (isStartRideFlow) {
+            stringResource(R.string.connect_start_title_scanning)
+        } else {
+            stringResource(R.string.connect_title_scanning)
+        }
+        isStartRideFlow -> stringResource(R.string.connect_start_title_disconnected)
         else -> stringResource(R.string.connect_title_disconnected)
     }
     val subtitle = when {
         !state.permissionsGranted -> stringResource(R.string.connect_subtitle_permission)
         state.connection.isConnected -> stringResource(R.string.connect_subtitle_connected)
-        state.connection.isConnecting -> stringResource(R.string.connect_subtitle_connecting)
-        state.connection.isScanning -> stringResource(R.string.connect_subtitle_scanning)
+        state.connection.isConnecting -> if (isStartRideFlow) {
+            stringResource(R.string.connect_start_subtitle_connecting)
+        } else {
+            stringResource(R.string.connect_subtitle_connecting)
+        }
+        state.connection.isScanning -> if (isStartRideFlow) {
+            stringResource(R.string.connect_start_subtitle_scanning)
+        } else {
+            stringResource(R.string.connect_subtitle_scanning)
+        }
+        isStartRideFlow -> stringResource(R.string.connect_start_subtitle_disconnected)
         else -> stringResource(R.string.connect_subtitle_disconnected)
     }
     Panel {
@@ -1785,6 +2260,7 @@ private fun EquipmentPowerToggle(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onRequestUnpair: () -> Unit,
+    showDeleteAction: Boolean = true,
     modifier: Modifier = Modifier.width(76.dp).height(44.dp),
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1892,20 +2368,22 @@ private fun EquipmentPowerToggle(
                     onDisconnect()
                 },
             )
-            HorizontalDivider(color = AppBorder)
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.equipment_menu_delete),
-                        color = AppDanger,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onRequestUnpair()
-                },
-            )
+            if (showDeleteAction) {
+                HorizontalDivider(color = AppBorder)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(R.string.equipment_menu_delete),
+                            color = AppDanger,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onRequestUnpair()
+                    },
+                )
+            }
         }
     }
 }
@@ -2271,7 +2749,6 @@ private fun deviceTypeLabel(type: BleDeviceType): String = when (type) {
     BleDeviceType.Other -> stringResource(R.string.device_type_other)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RideScreen(
     state: TrackerUiState,
@@ -2281,29 +2758,10 @@ private fun RideScreen(
     onRequestFinish: () -> Unit,
     onDismissFinish: () -> Unit,
     onConfirmFinish: () -> Unit,
-    onConfirmGoalOverride: (WorkoutGoal) -> Unit,
+    onEditGoal: () -> Unit,
     onClearFinishedRide: () -> Unit,
     onOpenFinishedRide: () -> Unit,
 ) {
-    var showGoalSheet by remember { mutableStateOf(false) }
-    var allowGoalSheetDismiss by remember { mutableStateOf(false) }
-    val goalSheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        confirmValueChange = { targetValue ->
-            targetValue != SheetValue.Hidden || allowGoalSheetDismiss
-        },
-    )
-    val goalSheetScope = rememberCoroutineScope()
-
-    fun dismissGoalSheet() {
-        allowGoalSheetDismiss = true
-        goalSheetScope.launch {
-            goalSheetState.hide()
-            showGoalSheet = false
-            allowGoalSheetDismiss = false
-        }
-    }
-
     if (state.rideStage == RideStage.Results && state.lastFinishedSession != null && !state.isWorkoutRunning) {
         TriumphScreen(
             session = state.lastFinishedSession,
@@ -2329,27 +2787,8 @@ private fun RideScreen(
         RidePlanningScreen(
             state = state,
             onStart = onStart,
-            onEditGoal = { showGoalSheet = true },
+            onEditGoal = onEditGoal,
         )
-    }
-
-    if (showGoalSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { dismissGoalSheet() },
-            sheetState = goalSheetState,
-            dragHandle = null,
-            containerColor = AppSurface,
-            contentColor = AppInk,
-        ) {
-            GoalOverrideSheet(
-                state = state,
-                onDismiss = { dismissGoalSheet() },
-                onConfirmGoal = { goal ->
-                    onConfirmGoalOverride(goal)
-                    dismissGoalSheet()
-                },
-            )
-        }
     }
 }
 
@@ -3161,6 +3600,121 @@ private fun WorkoutControls(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GoalValueEditSheet(
+    state: TrackerUiState,
+    onDismiss: () -> Unit,
+    onConfirmGoal: (WorkoutGoal) -> Unit,
+) {
+    val goal = state.workoutGoal
+    if (!goal.isActive) {
+        return
+    }
+    val unitSystem = state.settings.unitSystem
+    val type = goal.type
+    val focusRequester = remember { FocusRequester() }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var input by remember(type, goal.targetValue, unitSystem) {
+        mutableStateOf(GoalInputParser.inputText(goal, type, unitSystem))
+    }
+    val parsed = GoalInputParser.parse(type, input, unitSystem)
+    val errorMessage = parsed.error?.let { stringResource(goalInputErrorStringRes(it)) }
+    val confirmText = stringResource(R.string.confirm_new_goal)
+
+    LaunchedEffect(type, goal.targetValue) {
+        focusRequester.requestFocus()
+        bringIntoViewRequester.bringIntoView()
+        keyboard?.show()
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        GoalSheetHandle(onDismiss = onDismiss)
+        Text(
+            stringResource(R.string.edit_goal),
+            style = MaterialTheme.typography.titleLarge,
+            color = AppInk,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            goalTypeLabel(type),
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        OutlinedTextField(
+            value = input,
+            onValueChange = { input = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .focusRequester(focusRequester)
+                .semantics {
+                    errorMessage?.let { contentDescription = it }
+                },
+            label = {
+                Text(
+                    when (type) {
+                        GoalType.Distance -> stringResource(R.string.distance_goal)
+                        GoalType.Calories -> stringResource(R.string.calories_goal)
+                        GoalType.Duration -> stringResource(R.string.duration_goal)
+                        GoalType.None -> stringResource(R.string.goal)
+                    },
+                )
+            },
+            isError = errorMessage != null,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = when (type) {
+                    GoalType.Distance -> KeyboardType.Decimal
+                    GoalType.Duration -> KeyboardType.Text
+                    else -> KeyboardType.Number
+                },
+                imeAction = ImeAction.Done,
+            ),
+            supportingText = errorMessage?.let { message ->
+                { Text(message, color = AppDanger) }
+            },
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
+            Button(
+                onClick = {
+                    parsed.goal?.let(onConfirmGoal)
+                },
+                enabled = parsed.isValid,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    confirmText,
+                    color = AppBackground,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
